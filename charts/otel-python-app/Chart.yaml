@@ -1,0 +1,6 @@
+apiVersion: v2
+name: otel-python-app
+description: A Python Flask app with OpenTelemetry instrumentation
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

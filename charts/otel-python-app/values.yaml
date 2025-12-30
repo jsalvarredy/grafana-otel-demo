@@ -1,0 +1,31 @@
+image:
+  repository: otel-python-app
+  pullPolicy: Never # Force using local image loaded into Kind
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: python-otel-example.localhost
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  # OTEL Collector endpoint
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+  # Attributes required for the dashboard
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=python-app,deployment.environment.name=demo,service.namespace=demo"

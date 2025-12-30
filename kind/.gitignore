@@ -1,0 +1,5 @@
+.kube/*
+.age/*
+helmfile.d/values/argocd/secrets copy.yaml
+helmfile.d/values/argocd-apps/values copy.yaml
+.credentials

@@ -1,0 +1,22 @@
+tempo:
+  repository: grafana/tempo
+  tag: latest
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
+
+persistence:
+  enabled: false

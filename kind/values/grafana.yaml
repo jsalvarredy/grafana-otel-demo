@@ -1,0 +1,67 @@
+adminPassword: "Mikroways123"
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - grafana-otel-demo.localhost
+  path: /
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: Prometheus        
+        # Service URL for prometheus server (from prometheus-community chart)
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+        isDefault: true
+        jsonData:
+          # This enables the jump from Metrics to Traces (Exemplars)
+          exemplarTraceIdDestinations:
+            - name: trace_id
+              datasourceUid: Tempo # Debe coincidir con el UID de Tempo abajo
+
+      - name: Loki
+        type: loki
+        uid: Loki
+        url: http://loki-gateway.monitoring.svc.cluster.local:80
+        access: proxy
+        jsonData:
+          derivedFields:
+            - datasourceUid: Tempo
+              name: TraceID
+              matcherType: label
+              matcherRegex: trace_id
+              url: '$${__value.raw}'
+
+      - name: Tempo
+        type: tempo
+        uid: Tempo
+        url: http://tempo.monitoring.svc.cluster.local:3200
+        access: proxy
+        jsonData:
+          nodeGraph:
+            enabled: true
+          tracesToLogs:
+            datasourceUid: Loki
+            filterByTraceID: true
+            filterBySpanID: true
+            spanStartTimeShift: '-5m'
+            spanEndTimeShift: '5m'
+          lokiSearch:
+            datasourceUid: Loki
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    folder: /tmp/dashboards
+    provider:
+      allowUiUpdates: true
+
+

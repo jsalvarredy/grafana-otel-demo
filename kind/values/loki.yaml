@@ -1,0 +1,81 @@
+deploymentMode: SingleBinary
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+loki:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  commonConfig:
+    replication_factor: 1
+# Configuración crítica para que funcione con OTel Collector
+  limits_config:
+    allow_structured_metadata: true
+    max_label_name_length: 1024
+    max_label_value_length: 2048
+    # Rechazar logs muy viejos para no sobrecargar ingester
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h    
+  schemaConfig:
+    configs:
+      - from: 2024-04-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+  
+  # Disable multi-tenant authentication for simplicity
+  auth_enabled: false
+
+
+chunksCache:
+  enabled: true
+  # IMPORTANTE: Esto le dice a Memcached que use solo 256MB internamente
+  # Si no pones esto, por defecto intenta usar mucha más RAM y crashea.
+  allocatedMemory: 128
+  resources:
+    limits:
+      memory: 256Mi  # Límite duro del contenedor (debe ser mayor al allocatedMemory)
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+# Configuración del único Pod que hará todo
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 1Gi
+
+# El Gateway es el servicio frontal (Nginx)
+gateway:
+  enabled: true
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+# Desactivamos componentes distribuidos que no se usan en SingleBinary
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
