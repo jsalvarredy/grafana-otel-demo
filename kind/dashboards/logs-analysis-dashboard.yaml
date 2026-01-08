@@ -9,7 +9,20 @@ data:
   logs-analysis.json: |
     {
       "annotations": {
-        "list": []
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
       },
       "editable": true,
       "fiscalYearStartMonth": 0,
@@ -19,24 +32,52 @@ data:
       "liveNow": false,
       "panels": [
         {
-          "collapsed": false,
+          "content": "# 🪵 Unified Logs & Traffic Analysis\n\n### 🔎 Controls\nUse the **Search Logs** field above to filter specific TraceIDs, UserIDs, or Error Messages across all panels.",
           "gridPos": {
-            "h": 1,
+            "h": 3,
             "w": 24,
             "x": 0,
             "y": 0
           },
           "id": 1,
-          "panels": [],
-          "title": "Logs Overview",
-          "type": "row"
+          "options": {
+            "code": {
+              "language": "markdown",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "<div class=\"markdown-html\"><h1>🪵 Unified Logs &amp; Traffic Analysis</h1>\n<h3>🔎 Controls</h3>\n<p>Use the <strong>Search Logs</strong> field above to filter specific TraceIDs, UserIDs, or Error Messages across all panels.</p>\n</div>",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.0.0",
+          "title": "Welcome",
+          "type": "text"
         },
         {
           "datasource": {
             "type": "loki",
-            "uid": "Loki"
+            "uid": "${datasource}"
           },
-          "description": "Log volume over time by service",
+          "description": "Barras APILADAS: Verde = Tráfico Normal, Rojo = Errores (500s/Exceptions)",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 3
+          },
+          "id": 2,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -52,9 +93,9 @@ data:
                 "fillOpacity": 80,
                 "gradientMode": "none",
                 "hideFrom": {
+                  "legend": false,
                   "tooltip": false,
-                  "viz": false,
-                  "legend": false
+                  "viz": false
                 },
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
@@ -62,7 +103,7 @@ data:
                 "scaleDistribution": {
                   "type": "linear"
                 },
-                "showPoints": "never",
+                "showPoints": "auto",
                 "spanNulls": false,
                 "stacking": {
                   "group": "A",
@@ -81,74 +122,19 @@ data:
                     "value": null
                   }
                 ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 1
-          },
-          "id": 2,
-          "options": {
-            "legend": {
-              "calcs": ["sum"],
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "loki",
-                "uid": "Loki"
-              },
-              "expr": "sum by (service_name) (count_over_time({service_name=~\".+\"}[$__interval]))",
-              "refId": "A"
-            }
-          ],
-          "title": "Log Volume by Service",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "Loki"
-          },
-          "description": "Distribution of log levels (INFO, WARNING, ERROR)",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "hideFrom": {
-                  "tooltip": false,
-                  "viz": false,
-                  "legend": false
-                }
-              },
-              "mappings": []
+              }
             },
             "overrides": [
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "ERROR"
+                  "options": "Errors (Exceptions/Failures)"
                 },
                 "properties": [
                   {
                     "id": "color",
                     "value": {
-                      "fixedColor": "red",
+                      "fixedColor": "#FF0000",
                       "mode": "fixed"
                     }
                   }
@@ -157,22 +143,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "WARNING"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "orange",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "INFO"
+                  "options": "Normal Traffic (Info/Debug)"
                 },
                 "properties": [
                   {
@@ -186,72 +157,83 @@ data:
               }
             ]
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 9
-          },
-          "id": 3,
-          "options": {
-            "legend": {
-              "displayMode": "table",
-              "placement": "right",
-              "showLegend": true,
-              "values": ["value", "percent"]
-            },
-            "pieType": "donut",
-            "tooltip": {
-              "mode": "single"
-            }
-          },
           "targets": [
             {
               "datasource": {
                 "type": "loki",
-                "uid": "Loki"
+                "uid": "${datasource}"
               },
-              "expr": "sum by (level) (count_over_time({service_name=~\".+\"} | json | __error__=\"\" [$__range]))",
+              "editorMode": "code",
+              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service\"} |= \"${search}\" !~ \"(?i)error|exception|fail\" [$__interval]))",
+              "legendFormat": "Normal Traffic (Info/Debug)",
+              "queryType": "range",
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service\"} |= \"${search}\" |= \"(?i)error|exception|fail\" [$__interval]))",
+              "legendFormat": "Errors (Exceptions/Failures)",
+              "queryType": "range",
+              "refId": "B"
             }
           ],
-          "title": "Log Levels Distribution",
-          "type": "piechart"
+          "title": "📊 Global Traffic Volume & Health",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 10
+          },
+          "id": 3,
+          "panels": [],
+          "title": "📦 Service: orders-service",
+          "type": "row"
         },
         {
           "datasource": {
             "type": "loki",
-            "uid": "Loki"
+            "uid": "${datasource}"
           },
-          "description": "Recent error logs from all services",
+          "description": "Live logs stream.",
           "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 9
+            "h": 12,
+            "w": 24,
+            "x": 0,
+            "y": 11
           },
           "id": 4,
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "prettifyLogMessage": false,
+            "prettifyLogMessage": true,
             "showCommonLabels": false,
             "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
+          "pluginVersion": "10.0.0",
           "targets": [
             {
               "datasource": {
                 "type": "loki",
-                "uid": "Loki"
+                "uid": "${datasource}"
               },
-              "expr": "{service_name=~\".+\"} | json | level=\"ERROR\"",
+              "editorMode": "code",
+              "expr": "{service_name=\"orders-service\"} |= \"${search}\"",
+              "queryType": "range",
               "refId": "A"
             }
           ],
-          "title": "Recent Errors",
+          "title": "📄 Live Logs: orders-service",
           "type": "logs"
         },
         {
@@ -260,24 +242,24 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 23
           },
           "id": 5,
           "panels": [],
-          "title": "Log Search & Exploration",
+          "title": "🛒 Service: products-service",
           "type": "row"
         },
         {
           "datasource": {
             "type": "loki",
-            "uid": "Loki"
+            "uid": "${datasource}"
           },
-          "description": "Search and explore all logs. Filters can be applied in the query.",
+          "description": "Live logs stream.",
           "gridPos": {
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 18
+            "y": 24
           },
           "id": 6,
           "options": {
@@ -285,89 +267,86 @@ data:
             "enableLogDetails": true,
             "prettifyLogMessage": true,
             "showCommonLabels": false,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
-            "wrapLogMessage": true
+            "wrapLogMessage": false
           },
+          "pluginVersion": "10.0.0",
           "targets": [
             {
               "datasource": {
                 "type": "loki",
-                "uid": "Loki"
+                "uid": "${datasource}"
               },
-              "expr": "{service_name=~\".+\"} | json",
+              "editorMode": "code",
+              "expr": "{service_name=\"products-service\"} |= \"${search}\"",
+              "queryType": "range",
               "refId": "A"
             }
           ],
-          "title": "All Service Logs",
-          "type": "logs"
-        },
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 30
-          },
-          "id": 7,
-          "panels": [],
-          "title": "Trace Correlation",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "Loki"
-          },
-          "description": "Logs with trace_id for correlation with distributed traces. Click on a trace_id to jump to Tempo.",
-          "gridPos": {
-            "h": 10,
-            "w": 24,
-            "x": 0,
-            "y": 31
-          },
-          "id": 8,
-          "options": {
-            "dedupStrategy": "none",
-            "enableLogDetails": true,
-            "prettifyLogMessage": true,
-            "showCommonLabels": false,
-            "showLabels": true,
-            "showTime": true,
-            "sortOrder": "Descending",
-            "wrapLogMessage": true
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "loki",
-                "uid": "Loki"
-              },
-              "expr": "{service_name=~\".+\"} | json | trace_id != \"\"",
-              "refId": "A"
-            }
-          ],
-          "title": "Logs with Trace Context",
+          "title": "📄 Live Logs: products-service",
           "type": "logs"
         }
       ],
-      "refresh": "10s",
       "schemaVersion": 38,
       "style": "dark",
-      "tags": ["opentelemetry", "logs", "loki"],
+      "tags": [
+        "loki",
+        "logs",
+        "poc",
+        "v3"
+      ],
       "templating": {
-        "list": []
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "Loki",
+              "value": "Loki"
+            },
+            "hide": 0,
+            "includeAll": false,
+            "label": "Datasource",
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "loki",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "type": "datasource"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "hide": 0,
+            "label": "Search Logs",
+            "name": "search",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          }
+        ]
       },
       "time": {
-        "from": "now-15m",
+        "from": "now-1h",
         "to": "now"
       },
       "timepicker": {},
       "timezone": "",
-      "title": "OpenTelemetry - Logs Analysis",
-      "uid": "otel-logs",
-      "version": 0,
+      "title": "Super Logs Dashboard V3 (Pro)",
+      "uid": "super-logs-poc-v3",
+      "version": 1,
       "weekStart": ""
     }
