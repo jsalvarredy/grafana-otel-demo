@@ -32,8 +32,10 @@ const logExporter = new OTLPLogExporter({
 
 // Create shared resource
 const resource = new Resource({
-  [SemanticResourceAttributes.SERVICE_NAME]: 'otel-demo-app',
+  [SemanticResourceAttributes.SERVICE_NAME]: 'products-service',
   [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
+  [SemanticResourceAttributes.SERVICE_NAMESPACE]: 'demo',
+  [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: 'demo',
 });
 
 // Initialize Logger Provider for logs
@@ -57,7 +59,7 @@ sdk.start();
 
 console.log(JSON.stringify({
   message: 'OpenTelemetry SDK initialized',
-  service: 'otel-demo-app',
+  service: 'products-service',
   endpoint: otlpEndpoint,
   exporters: ['traces', 'metrics', 'logs']
 }));

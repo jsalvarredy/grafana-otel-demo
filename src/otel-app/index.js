@@ -65,7 +65,7 @@ function emitLog(severity, message, attributes = {}) {
     attributes: {
       'trace_id': spanContext.traceId || '',
       'span_id': spanContext.spanId || '',
-      'service.name': 'products-service',
+      'service_name': 'products-service',
       ...attributes
     },
   });

@@ -27,5 +27,5 @@ resources:
 env:
   # OTEL Collector endpoint
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
-  # Attributes required for the dashboard
-  OTEL_RESOURCE_ATTRIBUTES: "service.name=python-app,deployment.environment.name=demo,service.namespace=demo"
+  # Products Service URL for inter-service communication
+  PRODUCTS_SERVICE_URL: "http://otel-demo-app:8080"

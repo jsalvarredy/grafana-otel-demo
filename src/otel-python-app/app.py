@@ -35,6 +35,8 @@ products_service_url = os.getenv('PRODUCTS_SERVICE_URL', 'http://otel-demo-app:8
 resource = Resource.create({
     ResourceAttributes.SERVICE_NAME: 'orders-service',
     ResourceAttributes.SERVICE_VERSION: '1.0.0',
+    ResourceAttributes.SERVICE_NAMESPACE: 'demo',
+    ResourceAttributes.DEPLOYMENT_ENVIRONMENT: 'demo',
 })
 
 # Configure trace provider
