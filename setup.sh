@@ -1,31 +1,91 @@
 #!/bin/bash
 
-# Simple Grafana LGTM + OpenTelemetry Demo Setup Script
-# This script creates a Kind cluster and deploys:
+# Grafana OpenTelemetry Demo - Enhanced Setup Script
+# This script creates a Kind cluster and deploys a complete observability stack:
 # - Nginx Ingress Controller
-# - Grafana (UI)
-# - Loki (Logs)
-# - Tempo (Traces)
-# - Loki (Logs)
-# - Tempo (Traces)
-# - Prometheus (Metrics)
+# - Grafana LGTP Stack (Loki, Grafana, Tempo, Prometheus)
 # - OpenTelemetry Collector
-# - Demo Node.js & Python apps instrumented with OpenTelemetry
+# - Demo microservices (Products Service &Orders Service)
 
 set -e  # Exit on any error
 
-echo "🚀 Starting Grafana LGTM + OpenTelemetry Demo Setup..."
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Helper functions
+print_header() {
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  $1${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+}
+
+print_step() {
+    echo -e "${BLUE}▶${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC}  $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_info() {
+    echo -e "${MAGENTA}ℹ${NC}  $1"
+}
+
+# Start
+clear
+print_header "🚀 Grafana LGTP + OpenTelemetry Demo Setup"
+echo ""
 
 # ============================================================================
 # PREREQUISITES CHECK
 # ============================================================================
-echo "📋 Checking prerequisites..."
-command -v kind >/dev/null 2>&1 || { echo "❌ kind is required"; exit 1; }
-command -v kubectl >/dev/null 2>&1 || { echo "❌ kubectl is required"; exit 1; }
-command -v helm >/dev/null 2>&1 || { echo "❌ helm is required"; exit 1; }
-command -v docker >/dev/null 2>&1 || { echo "❌ docker is required"; exit 1; }
-command -v helmfile >/dev/null 2>&1 || { echo "❌ helmfile is required"; exit 1; }
-echo "✅ All prerequisites found"
+print_step "Checking prerequisites..."
+
+check_command() {
+    if command -v $1 &> /dev/null; then
+        print_success "$1 found"
+        return 0
+    else
+        print_error "$1 not found"
+        return 1
+    fi
+}
+
+all_ok=true
+check_command kind || all_ok=false
+check_command kubectl || all_ok=false
+check_command helm || all_ok=false
+check_command docker || all_ok=false
+check_command helmfile || all_ok=false
+
+if [ "$all_ok" = false ]; then
+    echo ""
+    print_error "Missing required tools. Please install them and try again."
+    exit 1
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+    print_error "Docker is not running. Please start Docker and try again."
+    exit 1
+fi
+
+print_success "All prerequisites satisfied"
+echo ""
 
 # ============================================================================
 # KUBECONFIG SETUP
@@ -36,112 +96,252 @@ mkdir -p kind/.kube
 # ============================================================================
 # KIND CLUSTER CREATION
 # ============================================================================
+print_step "Setting up Kind cluster 'grafana-otel-demo'..."
+
 if kind get clusters 2>/dev/null | grep -q "^grafana-otel-demo$"; then
-  echo "⚠️  Kind cluster 'grafana-otel-demo' already exists. Reusing it."
+  print_warning "Kind cluster already exists. Reusing it."
 else
-  echo "📦 Creating Kind cluster 'grafana-otel-demo'..."
-  # reusing the config that exposes ports
+  print_step "Creating new Kind cluster..."
   kind create cluster --config kind/.kind/config.yaml --name grafana-otel-demo
-  echo "✅ Kind cluster created"
+  print_success "Kind cluster created"
 fi
+echo ""
 
 # ============================================================================
 # DEPLOY INFRASTRUCTURE VIA HELMFILE
 # ============================================================================
-echo "🚀 Deploying Infrastructure with Helmfile..."
+print_header "📦 Deploying Observability Stack"
+echo ""
 
-# Ensure monitoring namespace exists (sometimes handy if helmfile expects it or for hooks)
-kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+print_step "Creating monitoring namespace..."
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - > /dev/null 2>&1
 
-# Apply all helmfiles in kind/helmfile.d/
+print_step "Deploying infrastructure with Helmfile..."
+print_info "This may take 3-5 minutes. Please be patient..."
+echo ""
+
 helmfile -f kind/helmfile.d/ apply
 
-echo "✅ Grafana Observability Stack installed"
+echo ""
+print_success "Grafana Observability Stack deployed"
+echo ""
 
+# ============================================================================
+# DASHBOARD PROVISIONING
+# ============================================================================
+print_header "📊 Provisioning Grafana Dashboards"
+echo ""
 
-echo "🌐 Exposing Grafana via Ingress (configured in Helm values)..."
-echo "📊 Importing Grafana Dashboards (K8s & Logs)..."
-kubectl apply -f kind/dashboards/k8s-dashboard-cm.yaml
-kubectl apply -f kind/dashboards/logs-search-cm.yaml
+print_step "Applying dashboard ConfigMaps..."
+kubectl apply -f kind/dashboards/k8s-dashboard-cm.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/logs-search-cm.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/service-overview-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/tracing-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/logs-analysis-dashboard.yaml > /dev/null 2>&1
+
+print_success "5 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis)"
+echo ""
 
 # ============================================================================
 # BUILD AND DEPLOY DEMO APPLICATIONS
 # ============================================================================
-echo "🚀 Building and Deploying Demo Applications..."
+print_header "🏗️  Building and Deploying Demo Applications"
+echo ""
 
-# Build Images
-docker build -t otel-demo-app:latest src/otel-app
-docker build -t otel-python-app:latest src/otel-python-app
+print_step "Building Products Service (Node.js)..."
+docker build -t products-service:latest src/otel-app > /dev/null 2>&1
+print_success "Products Service image built"
 
-# Load Images
-kind load docker-image otel-demo-app:latest --name grafana-otel-demo
-kind load docker-image otel-python-app:latest --name grafana-otel-demo
+print_step "Building Orders Service (Python)..."
+docker build -t orders-service:latest src/otel-python-app > /dev/null 2>&1
+print_success "Orders Service image built"
 
-# Deploy Apps
+print_step "Loading images into Kind cluster..."
+kind load docker-image products-service:latest --name grafana-otel-demo > /dev/null 2>&1
+kind load docker-image orders-service:latest --name grafana-otel-demo > /dev/null 2>&1
+print_success "Images loaded into cluster"
+
+print_step "Creating demo namespace..."
+kubectl create namespace demo --dry-run=client -o yaml | kubectl apply -f - > /dev/null 2>&1
+
+print_step "Deploying Products Service..."
 helm upgrade --install otel-demo-app charts/otel-demo-app \
+  --set image.repository=products-service \
+  --set image.tag=latest \
   --namespace demo \
   --create-namespace \
   -f charts/otel-demo-app/values.yaml \
-  --wait --timeout 3m
+  --wait --timeout 3m > /dev/null 2>&1
+print_success "Products Service deployed"
 
+print_step "Deploying Orders Service..."
 helm upgrade --install otel-python-app charts/otel-python-app \
+  --set image.repository=orders-service \
+  --set image.tag=latest \
   --namespace demo \
   -f charts/otel-python-app/values.yaml \
-  --wait --timeout 3m
+  --wait --timeout 3m > /dev/null 2>&1
+print_success "Orders Service deployed"
+
+echo ""
+print_success "All services deployed successfully"
+echo ""
+
+# ============================================================================
+# WAIT FOR SERVICES TO BE READY
+# ============================================================================
+print_step "Waiting for services to be fully ready..."
+sleep 10
+print_success "Services are ready"
+echo ""
 
 # ============================================================================
 # GENERATE SAMPLE TRAFFIC
 # ============================================================================
-echo "🎲 Generating sample traffic to create observability data..."
-echo "   This will create traces, logs, and metrics in Grafana"
+print_header "🎲 Generating Sample Observability Data"
+echo ""
 
-# Generate diverse traffic to different endpoints
-for i in {1..20}; do
-  # Node.js app traffic
-  curl -s -H "Host: otel-example.localhost" http://localhost/ > /dev/null || true
-  curl -s -H "Host: otel-example.localhost" http://localhost/rolldice > /dev/null || true
-  curl -s -H "Host: otel-example.localhost" http://localhost/work > /dev/null || true
-  curl -s -H "Host: otel-example.localhost" http://localhost/health > /dev/null || true
-  # Generate some errors for interesting data
-  if (( i % 5 == 0 )); then
-    curl -s -H "Host: otel-example.localhost" http://localhost/error > /dev/null || true
-  fi
-  
-  # Python app traffic
-  curl -s -H "Host: python-otel-example.localhost" http://localhost/ > /dev/null || true
-  curl -s -H "Host: python-otel-example.localhost" http://localhost/rolldice > /dev/null || true
-  curl -s -H "Host: python-otel-example.localhost" http://localhost/work > /dev/null || true
-  curl -s -H "Host: python-otel-example.localhost" http://localhost/health > /dev/null || true
-  if (( i % 5 == 0 )); then
-    curl -s -H "Host: python-otel-example.localhost" http://localhost/error > /dev/null || true
-  fi
-  
-  echo -n "."
-  sleep 0.5
+print_info "Simulating realistic e-commerce traffic patterns..."
+print_info "This will create traces, logs, and metrics visible in Grafana"
+echo ""
+
+# Function to make HTTP requests
+make_request() {
+    local host=$1
+    local path=$2
+    local method=${3:-GET}
+    local data=${4:-}
+    
+    if [ "$method" = "POST" ]; then
+        curl -s -X POST \
+            -H "Host: $host" \
+            -H "Content-Type: application/json" \
+            -d "$data" \
+            http://localhost${path} > /dev/null 2>&1 || true
+    else
+        curl -s -H "Host: $host" http://localhost${path} > /dev/null 2>&1 || true
+    fi
+}
+
+# Simulate realistic e-commerce traffic
+for i in {1..30}; do
+    # Users browsing products
+    make_request "otel-example.localhost" "/api/products"
+    make_request "otel-example.localhost" "/api/categories"
+    
+    # Viewing individual products
+    product_id=$((RANDOM % 8 + 1))
+    make_request "otel-example.localhost" "/api/products/${product_id}"
+    
+    # Some users place orders (which calls Products Service from Orders Service)
+    if (( RANDOM % 3 == 0 )); then
+        order_data="{\"product_id\": ${product_id}, \"quantity\": 1, \"user_id\": \"user-$((RANDOM % 20 + 1))\"}"
+        make_request "python-otel-example.localhost" "/api/orders" "POST" "$order_data"
+    fi
+    
+    # Health checks
+    make_request "otel-example.localhost" "/health"
+    make_request "python-otel-example.localhost" "/health"
+    
+    # Occasional errors for interesting data
+    if (( i % 10 == 0 )); then
+        make_request "otel-example.localhost" "/error"
+        make_request "python-otel-example.localhost" "/error"
+    fi
+    
+    # Progress indicator
+    echo -n "."
+    sleep 0.3
 done
 
 echo ""
-echo "✅ Sample traffic generated"
+echo ""
+print_success "Sample traffic generated successfully"
+echo ""
+
+# ============================================================================
+# DNS CONFIGURATION REMINDER
+# ============================================================================
+print_header "🌐 Access Information"
+echo ""
+
+# Check if entries exist in /etc/hosts
+if grep -q "grafana-otel-demo.localhost" /etc/hosts 2>/dev/null && \
+   grep -q "otel-example.localhost" /etc/hosts 2>/dev/null && \
+   grep -q "python-otel-example.localhost" /etc/hosts 2>/dev/null; then
+    print_success "/etc/hosts configuration found"
+else
+    print_warning "DNS Configuration Required"
+    echo ""
+    echo -e "Add the following to your ${YELLOW}/etc/hosts${NC} file:"
+    echo -e "${GREEN}127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost${NC}"
+    echo ""
+    echo "Quick command (requires sudo):"
+    echo -e "${CYAN}echo '127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost' | sudo tee -a /etc/hosts${NC}"
+    echo ""
+fi
+
 # ============================================================================
 # SETUP COMPLETE
 # ============================================================================
+print_header "✅ Setup Complete!"
 echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "✅ Setup Complete! Grafana Observability + OTel Demo is ready"
-echo "════════════════════════════════════════════════════════════════"
+
+echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║          🎯 Your Observability Demo is Ready!             ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "📊 Grafana UI:"
-echo "   URL:      http://grafana-otel-demo.localhost"
-echo "   User:     admin"
-echo "   Password: Mikroways123"
+
+echo -e "${CYAN}📊 Grafana Dashboard:${NC}"
+echo -e "   URL:      ${BLUE}http://grafana-otel-demo.localhost${NC}"
+echo -e "   User:     ${YELLOW}admin${NC}"
+echo -e "   Password: ${YELLOW}Mikroways123${NC}"
 echo ""
-echo "🚀 Demo Applications:"
-echo "   Node.js:  http://otel-example.localhost/"
-echo "   Python:   http://python-otel-example.localhost/"
+
+echo -e "${CYAN}🛍️  Demo Services:${NC}"
+echo -e "   Products Service: ${BLUE}http://otel-example.localhost${NC}"
+echo -e "   Orders Service:   ${BLUE}http://python-otel-example.localhost${NC}"
 echo ""
-echo "📝 Add to /etc/hosts: 127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost"
+
+echo -e "${CYAN}🔍 What to Explore in Grafana:${NC}"
+echo -e "   ${GREEN}1.${NC} Dashboards → Browse"
+echo -e "      • ${MAGENTA}Service Overview${NC} - RED metrics for all services"
+echo -e "      • ${MAGENTA}Distributed Tracing${NC} - View request flows across services"
+echo -e "      • ${MAGENTA}Logs Analysis${NC} - Structured logs with trace correlation"
 echo ""
-echo "🔥 Generate traffic by visiting the app URLs!"
+echo -e "   ${GREEN}2.${NC} Explore → Data Sources"
+echo -e "      • ${MAGENTA}Prometheus${NC} - Query metrics like ${YELLOW}http_requests_total${NC}"
+echo -e "      • ${MAGENTA}Loki${NC} - Search logs with ${YELLOW}{service_name=\"products-service\"}${NC}"
+echo -e "      • ${MAGENTA}Tempo${NC} - Search traces and click through to logs"
+echo ""
+echo -e "   ${GREEN}3.${NC} Try correlating:"
+echo -e "      • Find a trace_id in logs → Jump to Tempo"
+echo -e"      • Click on a trace span → View related logs"
+echo -e "      • See how Orders Service calls Products Service"
+echo ""
+
+echo -e "${CYAN}🎮 Generate More Traffic:${NC}"
+echo -e "   ${YELLOW}# Browse products${NC}"
+echo -e "   curl http://otel-example.localhost/api/products"
+echo ""
+echo -e "   ${YELLOW}# Create an order (triggers inter-service call)${NC}"
+echo -e "   curl -X POST http://python-otel-example.localhost/api/orders \\"
+echo -e "     -H 'Content-Type: application/json' \\"
+echo -e "     -d '{\"product_id\": 1, \"quantity\": 1, \"user_id\": \"user-123\"}'"
+echo ""
+
+echo -e "${CYAN}🧹 Cleanup:${NC}"
+echo -e "   kind delete cluster --name grafana-otel-demo"
+echo ""
+
+print_success "Happy Observing! 🚀"
+echo ""
 
 
-[ ! -f .envrc ] && cp .envrc-example .envrc && direnv allow
+# Create or update .envrc for direnv users
+if [ ! -f .envrc ]; then
+    cp .envrc-example .envrc 2>/dev/null || true
+    if command -v direnv &> /dev/null; then
+        direnv allow 2>/dev/null || true
+    fi
+fi
