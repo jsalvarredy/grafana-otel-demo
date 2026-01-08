@@ -7,351 +7,361 @@ metadata:
     grafana_dashboard: "1"
 data:
   tracing.json: |
-    {
-      "annotations": {
-        "list": []
-      },
-      "editable": true,
-      "fiscalYearStartMonth": 0,
-      "graphTooltip": 0,
-      "id": null,
-      "links": [],
-      "liveNow": false,
-      "panels": [
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 0
-          },
-          "id": 1,
-          "panels": [],
-          "title": "Distributed Tracing Overview",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "tempo",
-            "uid": "Tempo"
-          },
-          "gridPos": {
-            "h": 12,
-            "w": 24,
-            "x": 0,
-            "y": 1
-          },
-          "id": 2,
-          "options": {
-            "query": "{service.name=\"otel-demo-app\"}",
-            "queryType": "nativeSearch",
-            "limit": 20,
-            "tableType": "traces"
-          },
-          "pluginVersion": "9.5.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "tempo",
-                "uid": "Tempo"
-              },
-              "limit": 20,
-              "queryType": "nativeSearch",
-              "refId": "A",
-              "serviceName": "otel-demo-app"
-            }
-          ],
-          "title": "Recent Traces - Node.js Service",
-          "type": "traces"
-        },
-        {
-          "datasource": {
-            "type": "tempo",
-            "uid": "Tempo"
-          },
-          "gridPos": {
-            "h": 12,
-            "w": 24,
-            "x": 0,
-            "y": 13
-          },
-          "id": 3,
-          "options": {
-            "query": "{service.name=\"otel-python-app\"}",
-            "queryType": "nativeSearch",
-            "limit": 20,
-            "tableType": "traces"
-          },
-          "pluginVersion": "9.5.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "tempo",
-                "uid": "Tempo"
-              },
-              "limit": 20,
-              "queryType": "nativeSearch",
-              "refId": "A",
-              "serviceName": "otel-python-app"
-            }
-          ],
-          "title": "Recent Traces - Python Service",
-          "type": "traces"
-        },
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 25
-          },
-          "id": 4,
-          "panels": [],
-          "title": "Trace Statistics",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "description": "Shows the distribution of trace durations across services",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "tooltip": false,
-                  "viz": false,
-                  "legend": false
-                },
-                "lineInterpolation": "smooth",
-                "lineWidth": 2,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 26
-          },
-          "id": 5,
-          "options": {
-            "legend": {
-              "calcs": ["mean", "max"],
-              "displayMode": "table",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
-              "expr": "histogram_quantile(0.95, sum(rate(traces_span_duration_milliseconds_bucket[5m])) by (le, service_name)) ",
-              "legendFormat": "{{service_name}} - p95",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
-              "expr": "histogram_quantile(0.50, sum(rate(traces_span_duration_milliseconds_bucket[5m])) by (le, service_name))",
-              "legendFormat": "{{service_name}} - p50",
-              "refId": "B"
-            }
-          ],
-          "title": "Span Duration Distribution",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "description": "Number of spans created per second by each service",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 20,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "tooltip": false,
-                  "viz": false,
-                  "legend": false
-                },
-                "lineInterpolation": "smooth",
-                "lineWidth": 2,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "normal"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 26
-          },
-          "id": 6,
-          "options": {
-            "legend": {
-              "calcs": ["mean", "lastNotNull"],
-              "displayMode": "table",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
-              "expr": "sum(rate(traces_spans_total[5m])) by (service_name)",
-              "legendFormat": "{{service_name}}",
-              "refId": "A"
-            }
-          ],
-          "title": "Spans per Second",
-          "type": "timeseries"
-        },
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 34
-          },
-          "id": 7,
-          "panels": [],
-          "title": "Search Traces",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "tempo",
-            "uid": "Tempo"
-          },
-          "description": "Search for traces by various criteria. Use TraceQL or service/span/tag filters.",
-          "gridPos": {
-            "h": 15,
-            "w": 24,
-            "x": 0,
-            "y": 35
-          },
-          "id": 8,
-          "targets": [
-            {
-              "datasource": {
-                "type": "tempo",
-                "uid": "Tempo"
-              },
-              "queryType": "nativeSearch",
-              "refId": "A"
-            }
-          ],
-          "title": "TraceQL / Search",
-          "type": "traces"
-        }
-      ],
-      "refresh": "30s",
-      "schemaVersion": 38,
-      "style": "dark",
-      "tags": ["opentelemetry", "tracing", "tempo"],
-      "templating": {
-        "list": []
-      },
-      "time": {
-        "from": "now-30m",
-        "to": "now"
-      },
-      "timepicker": {},
-      "timezone": "",
-      "title": "OpenTelemetry - Distributed Tracing",
-      "uid": "otel-tracing",
-      "version": 0,
-      "weekStart": ""
-    }
+   {
+     "annotations": {
+       "list": [
+         {
+           "builtIn": 1,
+           "datasource": {
+             "type": "grafana",
+             "uid": "-- Grafana --"
+           },
+           "enable": true,
+           "hide": true,
+           "iconColor": "rgba(0, 211, 255, 1)",
+           "name": "Annotations & Alerts",
+           "type": "dashboard"
+         }
+       ]
+     },
+     "editable": true,
+     "fiscalYearStartMonth": 0,
+     "graphTooltip": 0,
+     "id": null,
+     "links": [],
+     "liveNow": false,
+     "panels": [
+       {
+         "content": "# 🚀 Distributed Tracing PoC\n\nThis dashboard provides a high-level view of the tracing telemetry stored in **Tempo**.\n\nIt is focused on two main services:\n* **orders-service**\n* **products-service**\n\nUse the panels below to quickly identify **Errors** (500s) and **High Latency** events.",
+         "gridPos": {
+           "h": 4,
+           "w": 24,
+           "x": 0,
+           "y": 0
+         },
+         "id": 1,
+         "options": {
+           "code": {
+             "language": "markdown",
+             "showLineNumbers": false,
+             "showMiniMap": false
+           },
+           "content": "<div class=\"markdown-html\"><h1>🚀 Distributed Tracing PoC</h1>\n<p>This dashboard provides a high-level view of the tracing telemetry stored in <strong>Tempo</strong>.</p>\n<p>It is focused on two main services:</p>\n<ul>\n<li><strong>orders-service</strong></li>\n<li><strong>products-service</strong></li>\n</ul>\n<p>Use the panels below to quickly identify <strong>Errors</strong> (500s) and <strong>High Latency</strong> events.</p>\n</div>",
+           "mode": "markdown"
+         },
+         "pluginVersion": "10.0.0",
+         "title": "Welcome",
+         "type": "text"
+       },
+       {
+         "collapsed": false,
+         "gridPos": {
+           "h": 1,
+           "w": 24,
+           "x": 0,
+           "y": 4
+         },
+         "id": 2,
+         "panels": [],
+         "title": "📦 Service: orders-service",
+         "type": "row"
+       },
+       {
+         "datasource": {
+           "type": "tempo",
+           "uid": "${datasource}"
+         },
+         "description": "Shows traces for 'orders-service' that have an error status or HTTP 500 code.",
+         "gridPos": {
+           "h": 9,
+           "w": 12,
+           "x": 0,
+           "y": 5
+         },
+         "id": 3,
+         "options": {
+           "cellHeight": "sm",
+           "footer": {
+             "countRows": false,
+             "fields": "",
+             "reducer": [
+               "sum"
+             ],
+             "show": false
+           },
+           "showHeader": true,
+           "sortBy": [
+             {
+               "desc": true,
+               "displayName": "Start time"
+             }
+           ]
+         },
+         "pluginVersion": "10.0.0",
+         "targets": [
+           {
+             "datasource": {
+               "type": "tempo",
+               "uid": "${datasource}"
+             },
+             "query": "{ resource.service.name = \"orders-service\" && (status = error || span.http.status_code >= 500) }",
+             "queryType": "traceql",
+             "refId": "A"
+           }
+         ],
+         "title": "🚨 Recent Errors (Orders)",
+         "type": "table"
+       },
+       {
+         "datasource": {
+           "type": "tempo",
+           "uid": "${datasource}"
+         },
+         "description": "Shows traces for 'orders-service' that took longer than 500ms.",
+         "gridPos": {
+           "h": 9,
+           "w": 12,
+           "x": 12,
+           "y": 5
+         },
+         "id": 4,
+         "options": {
+           "cellHeight": "sm",
+           "footer": {
+             "countRows": false,
+             "fields": "",
+             "reducer": [
+               "sum"
+             ],
+             "show": false
+           },
+           "showHeader": true,
+           "sortBy": [
+             {
+               "desc": true,
+               "displayName": "Duration"
+             }
+           ]
+         },
+         "pluginVersion": "10.0.0",
+         "targets": [
+           {
+             "datasource": {
+               "type": "tempo",
+               "uid": "${datasource}"
+             },
+             "query": "{ resource.service.name = \"orders-service\" && duration > 500ms }",
+             "queryType": "traceql",
+             "refId": "A"
+           }
+         ],
+         "title": "🐢 Slow Traces > 500ms (Orders)",
+         "type": "table"
+       },
+       {
+         "collapsed": false,
+         "gridPos": {
+           "h": 1,
+           "w": 24,
+           "x": 0,
+           "y": 14
+         },
+         "id": 5,
+         "panels": [],
+         "title": "🛒 Service: products-service",
+         "type": "row"
+       },
+       {
+         "datasource": {
+           "type": "tempo",
+           "uid": "${datasource}"
+         },
+         "description": "Shows traces for 'products-service' that have an error status or HTTP 500 code.",
+         "gridPos": {
+           "h": 9,
+           "w": 12,
+           "x": 0,
+           "y": 15
+         },
+         "id": 6,
+         "options": {
+           "cellHeight": "sm",
+           "footer": {
+             "countRows": false,
+             "fields": "",
+             "reducer": [
+               "sum"
+             ],
+             "show": false
+           },
+           "showHeader": true,
+           "sortBy": [
+             {
+               "desc": true,
+               "displayName": "Start time"
+             }
+           ]
+         },
+         "pluginVersion": "10.0.0",
+         "targets": [
+           {
+             "datasource": {
+               "type": "tempo",
+               "uid": "${datasource}"
+             },
+             "query": "{ resource.service.name = \"products-service\" && (status = error || span.http.status_code >= 500) }",
+             "queryType": "traceql",
+             "refId": "A"
+           }
+         ],
+         "title": "🚨 Recent Errors (Products)",
+         "type": "table"
+       },
+       {
+         "datasource": {
+           "type": "tempo",
+           "uid": "${datasource}"
+         },
+         "description": "Shows traces for 'products-service' that took longer than 500ms.",
+         "gridPos": {
+           "h": 9,
+           "w": 12,
+           "x": 12,
+           "y": 15
+         },
+         "id": 7,
+         "options": {
+           "cellHeight": "sm",
+           "footer": {
+             "countRows": false,
+             "fields": "",
+             "reducer": [
+               "sum"
+             ],
+             "show": false
+           },
+           "showHeader": true,
+           "sortBy": [
+             {
+               "desc": true,
+               "displayName": "Duration"
+             }
+           ]
+         },
+         "pluginVersion": "10.0.0",
+         "targets": [
+           {
+             "datasource": {
+               "type": "tempo",
+               "uid": "${datasource}"
+             },
+             "query": "{ resource.service.name = \"products-service\" && duration > 500ms }",
+             "queryType": "traceql",
+             "refId": "A"
+           }
+         ],
+         "title": "🐢 Slow Traces > 500ms (Products)",
+         "type": "table"
+       },
+       {
+         "collapsed": false,
+         "gridPos": {
+           "h": 1,
+           "w": 24,
+           "x": 0,
+           "y": 24
+         },
+         "id": 8,
+         "panels": [],
+         "title": "🔍 Advanced Explorer",
+         "type": "row"
+       },
+       {
+         "datasource": {
+           "type": "tempo",
+           "uid": "${datasource}"
+         },
+         "description": "Explore all traces without predefined filters.",
+         "gridPos": {
+           "h": 10,
+           "w": 24,
+           "x": 0,
+           "y": 25
+         },
+         "id": 9,
+         "options": {
+           "cellHeight": "sm",
+           "footer": {
+             "countRows": false,
+             "fields": "",
+             "reducer": [
+               "sum"
+             ],
+             "show": false
+           },
+           "showHeader": true,
+           "sortBy": [
+             {
+               "desc": true,
+               "displayName": "Start time"
+             }
+           ]
+         },
+         "pluginVersion": "10.0.0",
+         "targets": [
+           {
+             "datasource": {
+               "type": "tempo",
+               "uid": "${datasource}"
+             },
+             "query": "{ }",
+             "queryType": "traceql",
+             "refId": "A"
+           }
+         ],
+         "title": "All Traces Explorer",
+         "type": "table"
+       }
+     ],
+     "schemaVersion": 38,
+     "style": "dark",
+     "tags": [
+       "tempo",
+       "traces",
+       "poc"
+     ],
+     "templating": {
+       "list": [
+         {
+           "current": {
+             "selected": false,
+             "text": "Tempo",
+             "value": "Tempo"
+           },
+           "hide": 0,
+           "includeAll": false,
+           "label": "Datasource",
+           "multi": false,
+           "name": "datasource",
+           "options": [],
+           "query": "tempo",
+           "refresh": 1,
+           "regex": "",
+           "skipUrlSync": false,
+           "type": "datasource"
+         }
+       ]
+     },
+     "time": {
+       "from": "now-1h",
+       "to": "now"
+     },
+     "timepicker": {},
+     "timezone": "",
+     "title": "Super Traces Dashboard (PoC)",
+     "uid": "super-traces-poc-v1",
+     "version": 1,
+     "weekStart": ""
+   }
+
+   
