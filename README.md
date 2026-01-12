@@ -81,49 +81,39 @@ Password: Mikroways123
 
 This demo simulates a realistic e-commerce platform with two microservices:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Kind Kubernetes Cluster                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌────────────┐              ┌──────────────────────────┐          │
-│  │   Nginx    │◄─────────────┤   Ingress Resources       │          │
-│  │  Ingress   │   :80         └──────────────────────────┘          │
-│  └─────┬──────┘                                                     │
-│        │                                                             │
-│  ┌─────┴─────────────────────┬────────────────────────────┐        │
-│  │                           │                             │        │
-│  │                           │                             │        │
-│ ┌▼───────────┐   ┌──────────▼────────┐   ┌───────────────▼───┐    │
-│ │  Grafana   │   │ Products Service   │   │  Orders Service    │    │
-│ │    LGTP    │   │    (Node.js)       │   │    (Python)        │    │
-│ │            │   │                    │   │                    │    │
-│ │ • Grafana  │   │ Endpoints:         │   │ Endpoints:         │    │
-│ │ • Loki     │◄──┤ • GET /api/products│   │ • POST /api/orders │    │
-│ │ • Tempo    │   │ • GET /api/products│   │ • GET /api/orders  │    │
-│ │ • Prometheus│  │   /:id             │   │   /:id             │    │
-│ │            │   │ • POST /api/       │   │ • GET /api/orders/ │    │
-│ │ • OTEL     │   │   products/:id/    │   │   user/:userId     │    │
-│ │   Collector│   │   purchase         │   │                    │    │
-│ │            │   │ • GET /api/        │   │ Calls Products ──────┐│
-│ └────────────┘   │   inventory/:id    │   │ Service for data   ││ │
-│                  │                    │   │                    ││ │
-│                  │  OTEL Instrumented │   │  OTEL Instrumented  ││ │
-│                  │  • Auto Traces     │   │  • Auto Traces     ││ │
-│                  │  • Custom Metrics  │   │  • Custom Metrics  ││ │
-│                  │  • Structured Logs │   │  • Structured Logs ││ │
-│                  └────────────────────┘   └────────────────┬───┘│ │
-│                                                             │    │ │
-│                    ┌────────────────────────────────────────┘    │ │
-│                    │  Distributed Traces Flow Across Services   │ │
-│                    └─────────────────────────────────────────────┘ │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-
-              Telemetry Data Flow:
-              Traces  → Tempo (via OTEL Collector)
-              Metrics → Prometheus (via OTEL Collector)
-              Logs    → Loki (via OTEL Collector)
+```mermaid
+graph LR
+    User((User))
+    Ingress[Nginx Ingress]
+    
+    subgraph Cluster [Kind Cluster]
+        direction TB
+        Ingress --> |HTTP| ProductSvc[Product Service<br/>Node.js]
+        Ingress --> |HTTP| OrderSvc[Order Service<br/>Python]
+        
+        OrderSvc -.-> |REST /api/products/:id| ProductSvc
+        
+        ProductSvc --> |OTLP| Collector[OTEL Collector]
+        OrderSvc --> |OTLP| Collector
+        
+        subgraph LGTP [Grafana LGTP Stack]
+            direction TB
+            Collector --> |Traces| Tempo[Tempo]
+            Collector --> |Logs| Loki[Loki]
+            Collector --> |Metrics| Prometheus[Prometheus]
+            
+            Tempo -.-> Grafana[Grafana<br/>Visualization]
+            Loki -.-> Grafana
+            Prometheus -.-> Grafana
+        end
+    end
+    
+    style ProductSvc fill:#f9f,stroke:#333,stroke-width:2px
+    style OrderSvc fill:#bbf,stroke:#333,stroke-width:2px
+    style Grafana fill:#dfd,stroke:#333,stroke-width:2px
+    style Tempo fill:#eee,stroke:#333,stroke-dasharray: 5 5
+    style Loki fill:#eee,stroke:#333,stroke-dasharray: 5 5
+    style Prometheus fill:#eee,stroke:#333,stroke-dasharray: 5 5
 ```
 
 ### Service Communication Flow
