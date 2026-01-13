@@ -120,6 +120,15 @@ print_step "Deploying infrastructure with Helmfile..."
 print_info "This may take 3-5 minutes. Please be patient..."
 echo ""
 
+
+# Check if the "diff" plugin is NOT in the list
+if ! helm plugin list | grep -q "diff"; then
+    echo "helm-diff plugin not found. Installing..."
+    helm plugin install https://github.com/databus23/helm-diff
+else
+    echo "helm-diff plugin is already installed. Skipping installation."
+fi
+
 helmfile -f kind/helmfile.d/ apply
 
 echo ""
@@ -139,7 +148,7 @@ kubectl apply -f kind/dashboards/service-overview-dashboard.yaml > /dev/null 2>&
 kubectl apply -f kind/dashboards/tracing-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/logs-analysis-dashboard.yaml > /dev/null 2>&1
 
-print_success "5 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis)"
+print_success "6 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis, Executive)"
 echo ""
 
 # ============================================================================
