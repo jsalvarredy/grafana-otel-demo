@@ -74,20 +74,63 @@ logging.getLogger().setLevel(logging.INFO)
 tracer = trace.get_tracer(__name__)
 meter = metrics.get_meter(__name__)
 
-# Create custom metrics
+# ===================================================================
+# RED METRICS (Rate, Error, Duration) - Infrastructure Observability
+# ===================================================================
+
+# HTTP Request Counter - tracks all incoming requests (renamed for Prometheus compatibility)
 request_counter = meter.create_counter(
-    'http.requests.total',
-    description='Total number of HTTP requests',
+    'http_requests_total',
+    description='Total number of HTTP requests by endpoint, method, and status code',
 )
 
+# HTTP Server Duration - tracks request latency for SLA/SLO monitoring
+http_server_duration = meter.create_histogram(
+    'http_server_duration',
+    description='HTTP server request duration in milliseconds',
+    unit='ms',
+)
+
+# Order-specific metrics
 order_counter = meter.create_counter(
-    'orders.created.total',
+    'orders_created_total',
     description='Total number of orders created',
 )
 
 order_value_histogram = meter.create_histogram(
-    'orders.value',
+    'orders_value',
     description='Distribution of order values',
+)
+
+# ===================================================================
+# BUSINESS METRICS - For Executive Dashboard
+# ===================================================================
+
+# Order Revenue - tracks actual revenue from orders in dollars
+order_revenue_histogram = meter.create_histogram(
+    'order_revenue_dollars',
+    description='Distribution of order revenue in dollars',
+    unit='USD',
+)
+
+# Failed Transaction Revenue Lost - tracks revenue lost from failed transactions
+failed_transaction_revenue_counter = meter.create_counter(
+    'failed_transaction_revenue_lost',
+    description='Revenue lost due to failed transactions in dollars',
+    unit='USD',
+)
+
+# Order Processing Time - tracks how long orders take to process (SLA metric)
+order_processing_time_histogram = meter.create_histogram(
+    'order_processing_time_seconds',
+    description='Time taken to process orders in seconds',
+    unit='seconds',
+)
+
+# SLA Violation Events - tracks when order processing exceeds SLA threshold
+sla_violation_counter = meter.create_counter(
+    'sla_violation_events',
+    description='Count of SLA violations (order processing > 2 seconds)',
 )
 
 # Create Flask app
@@ -128,16 +171,58 @@ def emit_log(severity, message, **kwargs):
     print(json.dumps(log_data))
 
 # Simulate async processing latency
-def simulate_processing(): 
+def simulate_processing():
     time.sleep(0.05 + random.random() * 0.1)
+
+# ===================================================================
+# APM MIDDLEWARE - Automatic instrumentation for all endpoints
+# ===================================================================
+# Captures latency, status codes, and request metadata automatically
+# This middleware provides RED metrics (Rate, Errors, Duration) for all HTTP endpoints
+
+@app.before_request
+def before_request():
+    """Store request start time for latency calculation"""
+    from flask import g
+    g.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    """Capture metrics after request completes"""
+    from flask import g, request as flask_request
+
+    # Calculate request duration
+    if hasattr(g, 'start_time'):
+        duration_ms = (time.time() - g.start_time) * 1000  # Convert to milliseconds
+
+        # Get endpoint path (use rule if available, otherwise path)
+        endpoint = flask_request.url_rule.rule if flask_request.url_rule else flask_request.path
+        method = flask_request.method
+        status_code = response.status_code
+
+        # Record HTTP request counter with status code
+        request_counter.add(1, {
+            'endpoint': endpoint,
+            'method': method,
+            'http_status_code': str(status_code),
+            
+        })
+
+        # Record HTTP server duration (latency) for SLO monitoring
+        http_server_duration.record(duration_ms, {
+            'endpoint': endpoint,
+            'method': method,
+            'http_status_code': str(status_code),
+            
+        })
+
+    return response
 
 @app.route('/')
 def root():
     with tracer.start_as_current_span('handle-root-request') as span:
         emit_log('INFO', 'Received request on root endpoint', path='/', method='GET')
-        
-        request_counter.add(1, {'endpoint': '/', 'method': 'GET', 'service_name': 'orders-service'})
-        
+
         time.sleep(0.05)
         
         return jsonify({
@@ -155,26 +240,27 @@ def root():
 @app.route('/api/orders', methods=['POST'])
 def create_order():
     global order_id_counter
-    
+
+    # Track start time for processing time and SLA metrics
+    start_time = time.time()
+
     with tracer.start_as_current_span('create-order') as span:
         try:
             order_data = request.get_json()
             product_id = order_data.get('product_id')
             quantity = order_data.get('quantity', 1)
             user_id = order_data.get('user_id', 'user-' + str(random.randint(1, 100)))
-            
+
             span.set_attribute('order.product_id', product_id)
             span.set_attribute('order.quantity', quantity)
             span.set_attribute('order.user_id', user_id)
             
-            emit_log('INFO', 'Processing order creation', 
+            emit_log('INFO', 'Processing order creation',
                     endpoint='/api/orders',
                     product_id=product_id,
                     quantity=quantity,
                     user_id=user_id)
-            
-            request_counter.add(1, {'endpoint': '/api/orders', 'method': 'POST', 'service_name': 'orders-service'})
-            
+
             # Call Products Service to get product details
             with tracer.start_as_current_span('fetch-product-details') as product_span:
                 product_span.set_attribute('http.method', 'GET')
@@ -193,6 +279,22 @@ def create_order():
                     if product_response.status_code == 404:
                         product_span.set_status(Status(StatusCode.ERROR, 'Product not found'))
                         emit_log('WARNING', 'Product not found', product_id=product_id)
+
+                        # Track processing time and check for SLA violation
+                        processing_time = time.time() - start_time
+                        order_processing_time_histogram.record(processing_time, {
+                            
+                            'status': 'failed',
+                            'reason': 'product_not_found'
+                        })
+
+                        # SLA threshold: 2 seconds
+                        if processing_time > 2.0:
+                            sla_violation_counter.add(1, {
+                                
+                                'reason': 'product_not_found'
+                            })
+
                         return jsonify({'error': 'Product not found'}), 404
                     
                     product_response.raise_for_status()
@@ -205,9 +307,24 @@ def create_order():
                     
                 except requests.RequestException as e:
                     product_span.set_status(Status(StatusCode.ERROR, str(e)))
-                    emit_log('ERROR', 'Failed to fetch product details', 
+                    emit_log('ERROR', 'Failed to fetch product details',
                             error=str(e),
                             product_id=product_id)
+
+                    # Track processing time and check for SLA violation
+                    processing_time = time.time() - start_time
+                    order_processing_time_histogram.record(processing_time, {
+                        
+                        'status': 'failed',
+                        'reason': 'service_communication_error'
+                    })
+
+                    if processing_time > 2.0:
+                        sla_violation_counter.add(1, {
+                            
+                            'reason': 'service_communication_error'
+                        })
+
                     return jsonify({'error': 'Failed to communicate with Products Service'}), 503
             
             # Validate inventory
@@ -227,10 +344,35 @@ def create_order():
                     
                     if inventory_data['stock'] < quantity:
                         inventory_span.set_attribute('inventory.sufficient', False)
+
+                        # Calculate lost revenue
+                        lost_revenue = product_data['price'] * quantity
+                        failed_transaction_revenue_counter.add(lost_revenue, {
+                            
+                            'reason': 'insufficient_stock',
+                            'product_id': str(product_id)
+                        })
+
                         emit_log('WARNING', 'Insufficient inventory for order',
                                 product_id=product_id,
                                 requested=quantity,
-                                available=inventory_data['stock'])
+                                available=inventory_data['stock'],
+                                lost_revenue=lost_revenue)
+
+                        # Track processing time
+                        processing_time = time.time() - start_time
+                        order_processing_time_histogram.record(processing_time, {
+                            
+                            'status': 'failed',
+                            'reason': 'insufficient_stock'
+                        })
+
+                        if processing_time > 2.0:
+                            sla_violation_counter.add(1, {
+                                
+                                'reason': 'insufficient_stock'
+                            })
+
                         return jsonify({
                             'error': 'Insufficient stock',
                             'requested': quantity,
@@ -242,6 +384,21 @@ def create_order():
                 except requests.RequestException as e:
                     inventory_span.set_status(Status(StatusCode.ERROR, str(e)))
                     emit_log('ERROR', 'Failed to check inventory', error=str(e))
+
+                    # Track processing time
+                    processing_time = time.time() - start_time
+                    order_processing_time_histogram.record(processing_time, {
+                        
+                        'status': 'failed',
+                        'reason': 'inventory_check_failed'
+                    })
+
+                    if processing_time > 2.0:
+                        sla_violation_counter.add(1, {
+                            
+                            'reason': 'inventory_check_failed'
+                        })
+
                     return jsonify({'error': 'Inventory check failed'}), 503
             
             # Simulate order processing (payment, validation, etc.)
@@ -258,8 +415,32 @@ def create_order():
                 # Simulate occasional payment failures (3% chance)
                 if random.random() < 0.03:
                     payment_span.set_status(Status(StatusCode.ERROR, 'Payment processing failed'))
-                    emit_log('ERROR', 'Payment processing failed', 
-                            amount=total_amount)
+
+                    # Track lost revenue from payment failure
+                    failed_transaction_revenue_counter.add(total_amount, {
+                        
+                        'reason': 'payment_declined',
+                        'product_id': str(product_id)
+                    })
+
+                    emit_log('ERROR', 'Payment processing failed',
+                            amount=total_amount,
+                            lost_revenue=total_amount)
+
+                    # Track processing time
+                    processing_time = time.time() - start_time
+                    order_processing_time_histogram.record(processing_time, {
+                        
+                        'status': 'failed',
+                        'reason': 'payment_declined'
+                    })
+
+                    if processing_time > 2.0:
+                        sla_violation_counter.add(1, {
+                            
+                            'reason': 'payment_declined'
+                        })
+
                     return jsonify({'error': 'Payment processing failed'}), 402
             
             # Call Products Service to complete purchase
@@ -281,9 +462,34 @@ def create_order():
                     
                     if purchase_response.status_code != 200:
                         purchase_span.set_status(Status(StatusCode.ERROR, 'Purchase failed'))
+
+                        # Track lost revenue from purchase failure
+                        total_amount = product_data['price'] * quantity
+                        failed_transaction_revenue_counter.add(total_amount, {
+                            
+                            'reason': 'purchase_failed',
+                            'product_id': str(product_id)
+                        })
+
                         emit_log('ERROR', 'Purchase failed in Products Service',
                                 status_code=purchase_response.status_code,
-                                response=purchase_response.text)
+                                response=purchase_response.text,
+                                lost_revenue=total_amount)
+
+                        # Track processing time
+                        processing_time = time.time() - start_time
+                        order_processing_time_histogram.record(processing_time, {
+                            
+                            'status': 'failed',
+                            'reason': 'purchase_failed'
+                        })
+
+                        if processing_time > 2.0:
+                            sla_violation_counter.add(1, {
+                                
+                                'reason': 'purchase_failed'
+                            })
+
                         return jsonify({'error': 'Failed to complete purchase'}), 400
                     
                     purchase_result = purchase_response.json()
@@ -291,6 +497,21 @@ def create_order():
                 except requests.RequestException as e:
                     purchase_span.set_status(Status(StatusCode.ERROR, str(e)))
                     emit_log('ERROR', 'Failed to complete purchase', error=str(e))
+
+                    # Track processing time
+                    processing_time = time.time() - start_time
+                    order_processing_time_histogram.record(processing_time, {
+                        
+                        'status': 'failed',
+                        'reason': 'purchase_completion_failed'
+                    })
+
+                    if processing_time > 2.0:
+                        sla_violation_counter.add(1, {
+                            
+                            'reason': 'purchase_completion_failed'
+                        })
+
                     return jsonify({'error': 'Purchase completion failed'}), 503
             
             # Create order record
@@ -316,28 +537,66 @@ def create_order():
             order_counter.add(1, {
                 'product_id': str(product_id),
                 'user_id': user_id,
-                'service_name': 'orders-service'
+                
             })
             order_value_histogram.record(order_record['total_amount'], {
                 'product_id': str(product_id),
-                'service_name': 'orders-service'
+                
             })
-            
+
+            # Track successful order revenue
+            order_revenue_histogram.record(order_record['total_amount'], {
+                
+                'product_id': str(product_id),
+                'user_id': user_id
+            })
+
+            # Track processing time and check for SLA compliance
+            processing_time = time.time() - start_time
+            order_processing_time_histogram.record(processing_time, {
+                
+                'status': 'success'
+            })
+
+            # SLA threshold: 2 seconds
+            if processing_time > 2.0:
+                sla_violation_counter.add(1, {
+                    
+                    'reason': 'slow_processing'
+                })
+
             emit_log('INFO', 'Order created successfully',
                     order_id=order_id,
                     product_id=product_id,
                     total_amount=order_record['total_amount'],
-                    user_id=user_id)
-            
+                    user_id=user_id,
+                    processing_time_seconds=processing_time)
+
             span.set_attribute('order.id', order_id)
             span.set_attribute('order.total', order_record['total_amount'])
             span.set_attribute('order.status', 'confirmed')
-            
+            span.set_attribute('order.processing_time', processing_time)
+
             return jsonify({'order': order_record}), 201
             
         except Exception as e:
             span.set_status(Status(StatusCode.ERROR, str(e)))
             emit_log('ERROR', 'Error creating order', error=str(e))
+
+            # Track processing time
+            processing_time = time.time() - start_time
+            order_processing_time_histogram.record(processing_time, {
+                
+                'status': 'failed',
+                'reason': 'internal_error'
+            })
+
+            if processing_time > 2.0:
+                sla_violation_counter.add(1, {
+                    
+                    'reason': 'internal_error'
+                })
+
             return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/orders/<order_id>', methods=['GET'])
@@ -345,12 +604,10 @@ def get_order(order_id):
     with tracer.start_as_current_span('get-order') as span:
         span.set_attribute('order.id', order_id)
         
-        emit_log('INFO', 'Fetching order details', 
+        emit_log('INFO', 'Fetching order details',
                 endpoint='/api/orders/:id',
                 order_id=order_id)
-        
-        request_counter.add(1, {'endpoint': '/api/orders/:id', 'method': 'GET', 'service_name': 'orders-service'})
-        
+
         simulate_processing()
         
         order = orders.get(order_id)
@@ -371,12 +628,10 @@ def get_user_orders(user_id):
     with tracer.start_as_current_span('get-user-orders') as span:
         span.set_attribute('user.id', user_id)
         
-        emit_log('INFO', 'Fetching user orders', 
+        emit_log('INFO', 'Fetching user orders',
                 endpoint='/api/orders/user/:userId',
                 user_id=user_id)
-        
-        request_counter.add(1, {'endpoint': '/api/orders/user/:userId', 'method': 'GET', 'service_name': 'orders-service'})
-        
+
         simulate_processing()
         
         user_orders = [order for order in orders.values() if order['user_id'] == user_id]
@@ -398,12 +653,10 @@ def cancel_order(order_id):
     with tracer.start_as_current_span('cancel-order') as span:
         span.set_attribute('order.id', order_id)
         
-        emit_log('INFO', 'Processing order cancellation', 
+        emit_log('INFO', 'Processing order cancellation',
                 endpoint='/api/orders/:id/cancel',
                 order_id=order_id)
-        
-        request_counter.add(1, {'endpoint': '/api/orders/:id/cancel', 'method': 'POST', 'service_name': 'orders-service'})
-        
+
         order = orders.get(order_id)
         
         if not order:
@@ -441,7 +694,6 @@ def cancel_order(order_id):
 
 @app.route('/health')
 def health():
-    request_counter.add(1, {'endpoint': '/health', 'method': 'GET', 'service_name': 'orders-service'})
     emit_log('INFO', 'Health check', status='healthy')
     
     return jsonify({

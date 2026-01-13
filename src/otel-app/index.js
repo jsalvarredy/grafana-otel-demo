@@ -14,11 +14,22 @@ const meter = metrics.getMeter('products-service');
 // Get logger for sending logs to OTEL collector
 const logger = logs.getLogger('products-service', '1.0.0');
 
-// Create custom metrics
+// ===================================================================
+// RED METRICS (Rate, Error, Duration) - Infrastructure Observability
+// ===================================================================
+
+// HTTP Request Counter - tracks all incoming requests
 const requestCounter = meter.createCounter('http_requests_total', {
-  description: 'Total number of HTTP requests',
+  description: 'Total number of HTTP requests by endpoint, method, and status code',
 });
 
+// HTTP Server Duration - tracks request latency for SLA/SLO monitoring
+const httpServerDuration = meter.createHistogram('http_server_duration', {
+  description: 'HTTP server request duration in milliseconds',
+  unit: 'ms',
+});
+
+// Product-specific metrics
 const productViewCounter = meter.createCounter('products_viewed_total', {
   description: 'Total number of product views',
 });
@@ -30,6 +41,45 @@ const purchaseCounter = meter.createCounter('purchases_total', {
 const inventoryGauge = meter.createObservableGauge('inventory_level', {
   description: 'Current inventory level for products',
 });
+
+// ===================================================================
+// BUSINESS METRICS - For Executive Dashboard
+// ===================================================================
+
+// Revenue at Risk - tracks potential revenue loss during incidents
+const revenueAtRiskCounter = meter.createCounter('revenue_at_risk_dollars', {
+  description: 'Potential revenue loss in dollars during failures',
+  unit: 'USD',
+});
+
+// Transaction Value - tracks actual transaction amounts
+const transactionValueHistogram = meter.createHistogram('transaction_value_dollars', {
+  description: 'Distribution of transaction values in dollars',
+  unit: 'USD',
+});
+
+// Cart Abandonment - tracks when users don't complete purchases
+const cartAbandonmentCounter = meter.createCounter('cart_abandonment_total', {
+  description: 'Total number of abandoned carts/failed checkouts',
+});
+
+// Checkout Success Rate - tracks successful vs failed transactions
+const checkoutAttemptCounter = meter.createCounter('checkout_attempts_total', {
+  description: 'Total checkout attempts (success + failures)',
+});
+
+const checkoutSuccessCounter = meter.createCounter('checkout_success_total', {
+  description: 'Total successful checkouts',
+});
+
+// Customer Experience Score - gauge based on latency (0-100 scale)
+const customerExperienceGauge = meter.createObservableGauge('customer_experience_score', {
+  description: 'Customer experience score based on service latency (0-100)',
+});
+
+// Track recent response times for experience score calculation
+let recentResponseTimes = [];
+const MAX_SAMPLES = 20;
 
 // In-memory product catalog
 const products = [
@@ -52,6 +102,22 @@ inventoryGauge.addCallback((observableResult) => {
       category: product.category
     });
   });
+});
+
+// Register customer experience score callback
+// Score formula: 100 - (avg_latency_ms / 10)
+// < 100ms = 90-100 (excellent), 100-500ms = 50-90 (good), > 500ms = 0-50 (poor)
+customerExperienceGauge.addCallback((observableResult) => {
+  if (recentResponseTimes.length > 0) {
+    const avgLatency = recentResponseTimes.reduce((a, b) => a + b, 0) / recentResponseTimes.length;
+    // Score from 0 to 100, inversely proportional to latency
+    const score = Math.max(0, Math.min(100, 100 - (avgLatency / 10)));
+    observableResult.observe(score, {
+      
+    });
+  } else {
+    observableResult.observe(100, {  });
+  }
 });
 
 // Helper function to emit logs with trace context
@@ -84,6 +150,67 @@ function emitLog(severity, message, attributes = {}) {
 // Helper to simulate database latency
 const simulateDbLatency = () => new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
 
+// ===================================================================
+// APM MIDDLEWARE - Automatic instrumentation for all endpoints
+// ===================================================================
+// Captures latency, status codes, and request metadata automatically
+// This middleware provides RED metrics (Rate, Errors, Duration) for all HTTP endpoints
+app.use((req, res, next) => {
+  const startTime = Date.now();
+
+  // Store original res.json and res.send to intercept responses
+  const originalJson = res.json.bind(res);
+  const originalSend = res.send.bind(res);
+
+  // Intercept response to capture metrics
+  const captureMetrics = (body) => {
+    const duration = Date.now() - startTime;
+    const endpoint = req.route?.path || req.path || 'unknown';
+    const method = req.method;
+    const statusCode = res.statusCode;
+
+    // Record HTTP request counter with status code
+    requestCounter.add(1, {
+      endpoint,
+      method,
+      http_status_code: statusCode.toString(),
+      
+    });
+
+    // Record HTTP server duration (latency) for SLO monitoring
+    httpServerDuration.record(duration, {
+      endpoint,
+      method,
+      http_status_code: statusCode.toString(),
+      
+    });
+
+    // Track response times for customer experience score calculation
+    recentResponseTimes.push(duration);
+    if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
+
+    return body;
+  };
+
+  // Override res.json to capture metrics
+  res.json = function(body) {
+    captureMetrics(body);
+    return originalJson(body);
+  };
+
+  // Override res.send to capture metrics
+  res.send = function(body) {
+    captureMetrics(body);
+    return originalSend(body);
+  };
+
+  next();
+});
+
+// ===================================================================
+// ENDPOINTS
+// ===================================================================
+
 // Root endpoint
 app.get('/', (req, res) => {
   const span = trace.getTracer('products-service').startSpan('handle-root-request');
@@ -92,8 +219,6 @@ app.get('/', (req, res) => {
     path: '/',
     method: 'GET'
   });
-
-  requestCounter.add(1, { endpoint: '/', method: 'GET', service_name: 'products-service' });
 
   setTimeout(() => {
     span.end();
@@ -124,8 +249,6 @@ app.get('/api/products', async (req, res) => {
       category: category || 'all'
     });
 
-    requestCounter.add(1, { endpoint: '/api/products', method: 'GET', service_name: 'products-service' });
-
     // Simulate database query
     const dbSpan = trace.getTracer('products-service').startSpan('db-query-products', {
       parent: span,
@@ -144,7 +267,7 @@ app.get('/api/products', async (req, res) => {
 
     productViewCounter.add(filteredProducts.length, {
       category: category || 'all',
-      service_name: 'products-service'
+      
     });
 
     emitLog('INFO', 'Products retrieved successfully', {
@@ -184,8 +307,6 @@ app.get('/api/products/:id', async (req, res) => {
       product_id: productId
     });
 
-    requestCounter.add(1, { endpoint: '/api/products/:id', method: 'GET', service_name: 'products-service' });
-
     // Simulate database query
     await simulateDbLatency();
 
@@ -210,7 +331,7 @@ app.get('/api/products/:id', async (req, res) => {
     productViewCounter.add(1, {
       product_id: productId.toString(),
       product_name: product.name,
-      service_name: 'products-service'
+      
     });
 
     emitLog('INFO', 'Product details retrieved', {
@@ -239,6 +360,7 @@ app.post('/api/products/:id/purchase', async (req, res) => {
   const span = trace.getTracer('products-service').startSpan('purchase-product');
   const productId = parseInt(req.params.id);
   const quantity = req.body.quantity || 1;
+  const startTime = Date.now();
 
   try {
     span.setAttribute('product.id', productId);
@@ -250,7 +372,11 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       quantity
     });
 
-    requestCounter.add(1, { endpoint: '/api/products/:id/purchase', method: 'POST', service_name: 'products-service' });
+    // Track checkout attempt for success rate calculation
+    checkoutAttemptCounter.add(1, {
+      
+      product_id: productId.toString()
+    });
 
     // Simulate inventory check
     const inventorySpan = trace.getTracer('products-service').startSpan('check-inventory', {
@@ -265,9 +391,20 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       inventorySpan.end();
       span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
 
+      // Track cart abandonment and potential revenue loss
+      cartAbandonmentCounter.add(1, {
+        
+        reason: 'product_not_found'
+      });
+
       emitLog('WARNING', 'Purchase failed - product not found', {
         product_id: productId
       });
+
+      // Track response time for customer experience
+      const responseTime = Date.now() - startTime;
+      recentResponseTimes.push(responseTime);
+      if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
 
       span.end();
       return res.status(404).json({ error: 'Product not found' });
@@ -278,12 +415,31 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       inventorySpan.end();
       span.setStatus({ code: SpanStatusCode.ERROR, message: 'Insufficient stock' });
 
+      // Track cart abandonment and lost revenue
+      const lostRevenue = product.price * quantity;
+      cartAbandonmentCounter.add(1, {
+        
+        reason: 'insufficient_stock',
+        product_id: productId.toString()
+      });
+      revenueAtRiskCounter.add(lostRevenue, {
+        
+        reason: 'insufficient_stock',
+        product_name: product.name
+      });
+
       emitLog('WARNING', 'Purchase failed - insufficient stock', {
         product_id: productId,
         product_name: product.name,
         requested: quantity,
-        available: product.stock
+        available: product.stock,
+        lost_revenue: lostRevenue
       });
+
+      // Track response time for customer experience
+      const responseTime = Date.now() - startTime;
+      recentResponseTimes.push(responseTime);
+      if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
 
       span.end();
       return res.status(400).json({
@@ -310,10 +466,29 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       paymentSpan.end();
       span.setStatus({ code: SpanStatusCode.ERROR, message: 'Payment failed' });
 
+      // Track cart abandonment and lost revenue due to payment failure
+      const lostRevenue = product.price * quantity;
+      cartAbandonmentCounter.add(1, {
+        
+        reason: 'payment_declined',
+        product_id: productId.toString()
+      });
+      revenueAtRiskCounter.add(lostRevenue, {
+        
+        reason: 'payment_declined',
+        product_name: product.name
+      });
+
       emitLog('ERROR', 'Purchase failed - payment declined', {
         product_id: productId,
-        amount: product.price * quantity
+        amount: lostRevenue,
+        lost_revenue: lostRevenue
       });
+
+      // Track response time for customer experience
+      const responseTime = Date.now() - startTime;
+      recentResponseTimes.push(responseTime);
+      if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
 
       span.end();
       return res.status(402).json({ error: 'Payment declined' });
@@ -324,22 +499,44 @@ app.post('/api/products/:id/purchase', async (req, res) => {
     // Update inventory
     product.stock -= quantity;
 
+    // Calculate transaction value
+    const transactionValue = product.price * quantity;
+
+    // Track successful purchase metrics
     purchaseCounter.add(1, {
       product_id: productId.toString(),
       product_name: product.name,
-      service_name: 'products-service'
+      
+    });
+
+    // Track checkout success
+    checkoutSuccessCounter.add(1, {
+      
+      product_id: productId.toString()
+    });
+
+    // Track transaction value
+    transactionValueHistogram.record(transactionValue, {
+      
+      product_id: productId.toString(),
+      product_name: product.name
     });
 
     emitLog('INFO', 'Purchase completed successfully', {
       product_id: productId,
       product_name: product.name,
       quantity,
-      total_amount: product.price * quantity,
+      total_amount: transactionValue,
       remaining_stock: product.stock
     });
 
+    // Track response time for customer experience
+    const responseTime = Date.now() - startTime;
+    recentResponseTimes.push(responseTime);
+    if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
+
     span.setAttribute('purchase.success', true);
-    span.setAttribute('purchase.total', product.price * quantity);
+    span.setAttribute('purchase.total', transactionValue);
     span.end();
 
     res.json({
@@ -351,13 +548,24 @@ app.post('/api/products/:id/purchase', async (req, res) => {
     });
   } catch (error) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
+
+    // Track cart abandonment due to system error
+    cartAbandonmentCounter.add(1, {
+      
+      reason: 'system_error'
+    });
 
     emitLog('ERROR', 'Error processing purchase', {
       error: error.message,
       product_id: productId
     });
 
+    // Track response time for customer experience
+    const responseTime = Date.now() - startTime;
+    recentResponseTimes.push(responseTime);
+    if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
+
+    span.end();
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -374,8 +582,6 @@ app.get('/api/inventory/:productId', async (req, res) => {
       endpoint: '/api/inventory/:productId',
       product_id: productId
     });
-
-    requestCounter.add(1, { endpoint: '/api/inventory/:productId', method: 'GET', service_name: 'products-service' });
 
     await simulateDbLatency();
 
@@ -424,8 +630,6 @@ app.get('/api/categories', async (req, res) => {
       endpoint: '/api/categories'
     });
 
-    requestCounter.add(1, { endpoint: '/api/categories', method: 'GET', service_name: 'products-service' });
-
     await simulateDbLatency();
 
     const categories = [...new Set(products.map(p => p.category))];
@@ -450,7 +654,6 @@ app.get('/api/categories', async (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  requestCounter.add(1, { endpoint: '/health', method: 'GET', service_name: 'products-service' });
   emitLog('INFO', 'Health check', {
     status: 'healthy'
   });

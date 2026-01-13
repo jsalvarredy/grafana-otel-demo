@@ -1,0 +1,4 @@
+helm 3.19.4
+helmfile 0.171.0
+kind 0.31.0
+
