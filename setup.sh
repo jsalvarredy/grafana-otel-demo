@@ -147,6 +147,7 @@ kubectl apply -f kind/dashboards/logs-search-cm.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/service-overview-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/tracing-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/logs-analysis-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/executive-dashboard.yaml > /dev/null 2>&1
 
 print_success "6 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis, Executive)"
 echo ""

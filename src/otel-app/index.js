@@ -113,10 +113,10 @@ customerExperienceGauge.addCallback((observableResult) => {
     // Score from 0 to 100, inversely proportional to latency
     const score = Math.max(0, Math.min(100, 100 - (avgLatency / 10)));
     observableResult.observe(score, {
-      service_name: 'products-service',
+      
     });
   } else {
-    observableResult.observe(100, { service_name: 'products-service' });
+    observableResult.observe(100, {  });
   }
 });
 
@@ -174,7 +174,7 @@ app.use((req, res, next) => {
       endpoint,
       method,
       http_status_code: statusCode.toString(),
-      service_name: 'products-service',
+      
     });
 
     // Record HTTP server duration (latency) for SLO monitoring
@@ -182,7 +182,7 @@ app.use((req, res, next) => {
       endpoint,
       method,
       http_status_code: statusCode.toString(),
-      service_name: 'products-service',
+      
     });
 
     // Track response times for customer experience score calculation
@@ -267,7 +267,7 @@ app.get('/api/products', async (req, res) => {
 
     productViewCounter.add(filteredProducts.length, {
       category: category || 'all',
-      service_name: 'products-service'
+      
     });
 
     emitLog('INFO', 'Products retrieved successfully', {
@@ -331,7 +331,7 @@ app.get('/api/products/:id', async (req, res) => {
     productViewCounter.add(1, {
       product_id: productId.toString(),
       product_name: product.name,
-      service_name: 'products-service'
+      
     });
 
     emitLog('INFO', 'Product details retrieved', {
@@ -374,7 +374,7 @@ app.post('/api/products/:id/purchase', async (req, res) => {
 
     // Track checkout attempt for success rate calculation
     checkoutAttemptCounter.add(1, {
-      service_name: 'products-service',
+      
       product_id: productId.toString()
     });
 
@@ -393,7 +393,7 @@ app.post('/api/products/:id/purchase', async (req, res) => {
 
       // Track cart abandonment and potential revenue loss
       cartAbandonmentCounter.add(1, {
-        service_name: 'products-service',
+        
         reason: 'product_not_found'
       });
 
@@ -418,12 +418,12 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       // Track cart abandonment and lost revenue
       const lostRevenue = product.price * quantity;
       cartAbandonmentCounter.add(1, {
-        service_name: 'products-service',
+        
         reason: 'insufficient_stock',
         product_id: productId.toString()
       });
       revenueAtRiskCounter.add(lostRevenue, {
-        service_name: 'products-service',
+        
         reason: 'insufficient_stock',
         product_name: product.name
       });
@@ -469,12 +469,12 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       // Track cart abandonment and lost revenue due to payment failure
       const lostRevenue = product.price * quantity;
       cartAbandonmentCounter.add(1, {
-        service_name: 'products-service',
+        
         reason: 'payment_declined',
         product_id: productId.toString()
       });
       revenueAtRiskCounter.add(lostRevenue, {
-        service_name: 'products-service',
+        
         reason: 'payment_declined',
         product_name: product.name
       });
@@ -506,18 +506,18 @@ app.post('/api/products/:id/purchase', async (req, res) => {
     purchaseCounter.add(1, {
       product_id: productId.toString(),
       product_name: product.name,
-      service_name: 'products-service'
+      
     });
 
     // Track checkout success
     checkoutSuccessCounter.add(1, {
-      service_name: 'products-service',
+      
       product_id: productId.toString()
     });
 
     // Track transaction value
     transactionValueHistogram.record(transactionValue, {
-      service_name: 'products-service',
+      
       product_id: productId.toString(),
       product_name: product.name
     });
@@ -551,7 +551,7 @@ app.post('/api/products/:id/purchase', async (req, res) => {
 
     // Track cart abandonment due to system error
     cartAbandonmentCounter.add(1, {
-      service_name: 'products-service',
+      
       reason: 'system_error'
     });
 

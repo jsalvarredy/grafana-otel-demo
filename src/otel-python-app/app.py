@@ -205,7 +205,7 @@ def after_request(response):
             'endpoint': endpoint,
             'method': method,
             'http_status_code': str(status_code),
-            'service_name': 'orders-service',
+            
         })
 
         # Record HTTP server duration (latency) for SLO monitoring
@@ -213,7 +213,7 @@ def after_request(response):
             'endpoint': endpoint,
             'method': method,
             'http_status_code': str(status_code),
-            'service_name': 'orders-service',
+            
         })
 
     return response
@@ -283,7 +283,7 @@ def create_order():
                         # Track processing time and check for SLA violation
                         processing_time = time.time() - start_time
                         order_processing_time_histogram.record(processing_time, {
-                            'service_name': 'orders-service',
+                            
                             'status': 'failed',
                             'reason': 'product_not_found'
                         })
@@ -291,7 +291,7 @@ def create_order():
                         # SLA threshold: 2 seconds
                         if processing_time > 2.0:
                             sla_violation_counter.add(1, {
-                                'service_name': 'orders-service',
+                                
                                 'reason': 'product_not_found'
                             })
 
@@ -314,14 +314,14 @@ def create_order():
                     # Track processing time and check for SLA violation
                     processing_time = time.time() - start_time
                     order_processing_time_histogram.record(processing_time, {
-                        'service_name': 'orders-service',
+                        
                         'status': 'failed',
                         'reason': 'service_communication_error'
                     })
 
                     if processing_time > 2.0:
                         sla_violation_counter.add(1, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'service_communication_error'
                         })
 
@@ -348,7 +348,7 @@ def create_order():
                         # Calculate lost revenue
                         lost_revenue = product_data['price'] * quantity
                         failed_transaction_revenue_counter.add(lost_revenue, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'insufficient_stock',
                             'product_id': str(product_id)
                         })
@@ -362,14 +362,14 @@ def create_order():
                         # Track processing time
                         processing_time = time.time() - start_time
                         order_processing_time_histogram.record(processing_time, {
-                            'service_name': 'orders-service',
+                            
                             'status': 'failed',
                             'reason': 'insufficient_stock'
                         })
 
                         if processing_time > 2.0:
                             sla_violation_counter.add(1, {
-                                'service_name': 'orders-service',
+                                
                                 'reason': 'insufficient_stock'
                             })
 
@@ -388,14 +388,14 @@ def create_order():
                     # Track processing time
                     processing_time = time.time() - start_time
                     order_processing_time_histogram.record(processing_time, {
-                        'service_name': 'orders-service',
+                        
                         'status': 'failed',
                         'reason': 'inventory_check_failed'
                     })
 
                     if processing_time > 2.0:
                         sla_violation_counter.add(1, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'inventory_check_failed'
                         })
 
@@ -418,7 +418,7 @@ def create_order():
 
                     # Track lost revenue from payment failure
                     failed_transaction_revenue_counter.add(total_amount, {
-                        'service_name': 'orders-service',
+                        
                         'reason': 'payment_declined',
                         'product_id': str(product_id)
                     })
@@ -430,14 +430,14 @@ def create_order():
                     # Track processing time
                     processing_time = time.time() - start_time
                     order_processing_time_histogram.record(processing_time, {
-                        'service_name': 'orders-service',
+                        
                         'status': 'failed',
                         'reason': 'payment_declined'
                     })
 
                     if processing_time > 2.0:
                         sla_violation_counter.add(1, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'payment_declined'
                         })
 
@@ -466,7 +466,7 @@ def create_order():
                         # Track lost revenue from purchase failure
                         total_amount = product_data['price'] * quantity
                         failed_transaction_revenue_counter.add(total_amount, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'purchase_failed',
                             'product_id': str(product_id)
                         })
@@ -479,14 +479,14 @@ def create_order():
                         # Track processing time
                         processing_time = time.time() - start_time
                         order_processing_time_histogram.record(processing_time, {
-                            'service_name': 'orders-service',
+                            
                             'status': 'failed',
                             'reason': 'purchase_failed'
                         })
 
                         if processing_time > 2.0:
                             sla_violation_counter.add(1, {
-                                'service_name': 'orders-service',
+                                
                                 'reason': 'purchase_failed'
                             })
 
@@ -501,14 +501,14 @@ def create_order():
                     # Track processing time
                     processing_time = time.time() - start_time
                     order_processing_time_histogram.record(processing_time, {
-                        'service_name': 'orders-service',
+                        
                         'status': 'failed',
                         'reason': 'purchase_completion_failed'
                     })
 
                     if processing_time > 2.0:
                         sla_violation_counter.add(1, {
-                            'service_name': 'orders-service',
+                            
                             'reason': 'purchase_completion_failed'
                         })
 
@@ -537,16 +537,16 @@ def create_order():
             order_counter.add(1, {
                 'product_id': str(product_id),
                 'user_id': user_id,
-                'service_name': 'orders-service'
+                
             })
             order_value_histogram.record(order_record['total_amount'], {
                 'product_id': str(product_id),
-                'service_name': 'orders-service'
+                
             })
 
             # Track successful order revenue
             order_revenue_histogram.record(order_record['total_amount'], {
-                'service_name': 'orders-service',
+                
                 'product_id': str(product_id),
                 'user_id': user_id
             })
@@ -554,14 +554,14 @@ def create_order():
             # Track processing time and check for SLA compliance
             processing_time = time.time() - start_time
             order_processing_time_histogram.record(processing_time, {
-                'service_name': 'orders-service',
+                
                 'status': 'success'
             })
 
             # SLA threshold: 2 seconds
             if processing_time > 2.0:
                 sla_violation_counter.add(1, {
-                    'service_name': 'orders-service',
+                    
                     'reason': 'slow_processing'
                 })
 
@@ -586,14 +586,14 @@ def create_order():
             # Track processing time
             processing_time = time.time() - start_time
             order_processing_time_histogram.record(processing_time, {
-                'service_name': 'orders-service',
+                
                 'status': 'failed',
                 'reason': 'internal_error'
             })
 
             if processing_time > 2.0:
                 sla_violation_counter.add(1, {
-                    'service_name': 'orders-service',
+                    
                     'reason': 'internal_error'
                 })
 
