@@ -1,39 +1,73 @@
 # Grafana LGTP + OpenTelemetry Demo
 
-> **⚡ Production-Grade Observability in Minutes** - Experience the complete power of modern observability with OpenTelemetry and the Grafana stack, running locally in just one command.
+An observability demo using OpenTelemetry and the Grafana stack (Loki, Grafana, Tempo, Prometheus). Runs locally on a Kind cluster with a single command.
 
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Instrumented-blue?logo=opentelemetry)](https://opentelemetry.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-LGTP_Stack-orange?logo=grafana)](https://grafana.com/)
 [![Kind](https://img.shields.io/badge/Kubernetes-Kind-326CE5?logo=kubernetes)](https://kind.sigs.k8s.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 🎯 Why This Demo?
+## What's included
 
-This isn't just another "hello world" observability example. This demo shows you **exactly what developers need to see** when evaluating open-source observability:
+Two microservices simulating an e-commerce app (Products in Node.js, Orders in Python):
 
-✅ **Real microservices** with actual business logic (Products & Orders)  
-✅ **Distributed tracing** across service boundaries  
-✅ **Automatic correlation** between logs, traces, and metrics  
-✅ **Professional dashboards** ready to use  
-✅ **Zero configuration** - works out of the box  
-✅ **Inter-service communication** showing the true power of distributed tracing
-
-**Perfect for:** Technical demos, proof-of-concepts, learning OpenTelemetry, evaluating Grafana stack
+- 12 products with descriptions, ratings, and reviews
+- Distributed traces across services with span events
+- Automatic correlation between logs, traces, and metrics
+- Pre-built dashboards
+- Resilience patterns: circuit breakers, rate limiting, caching, retries
+- Traffic generator with user sessions and load patterns
 
 ---
 
-## 🚀 Quick Start
+## v2.0 changes
+
+### Products service
+- Full-text search across names, descriptions, and tags
+- Product recommendations by category
+- Filtering by category, price range, rating, with sorting
+- Cache simulation with hit/miss metrics
+- Rate limiting with metrics
+- Circuit breaker for database calls
+- Variable latency based on load
+
+### Orders service
+- Order tracking with status history
+- User session tracking
+- Returning vs new customer detection
+- Circuit breaker for products service calls
+- Retry with exponential backoff
+- Order cancellation with refund tracking
+
+### Traffic generator
+- User session simulation (browse -> cart -> checkout)
+- Time-based load patterns (peak hours, off-peak)
+- Burst traffic for flash sale scenarios
+- Multiple modes: fast, slow, burst
+
+### New metrics
+- Cache hit/miss ratio
+- Rate limited requests
+- Circuit breaker state
+- Active connections
+- Search queries and results
+- User sessions
+- Order cancellations
+
+---
+
+## Quick start
 
 ### Prerequisites
 
-Ensure you have these tools installed:
-- **Docker** (≥20.10) - [Install](https://docs.docker.com/get-docker/)
-- **Kind** (≥0.20) - [Install](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-- **Kubectl** (≥1.28) - [Install](https://kubernetes.io/docs/tasks/tools/)
-- **Helm** (≥3.12) - [Install](https://helm.sh/docs/intro/install/)
-- **Helmfile** (≥0.150) - [Install](https://github.com/helmfile/helmfile#installation)
+You'll need:
+- Docker (>=20.10) - [Install](https://docs.docker.com/get-docker/)
+- Kind (>=0.20) - [Install](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+- Kubectl (>=1.28) - [Install](https://kubernetes.io/docs/tasks/tools/)
+- Helm (>=3.12) - [Install](https://helm.sh/docs/intro/install/)
+- Helmfile (>=0.150) - [Install](https://github.com/helmfile/helmfile#installation)
 
-### One-Command Setup
+### Setup
 
 ```bash
 git clone https://github.com/your-org/grafana-otel-demo
@@ -41,307 +75,305 @@ cd grafana-otel-demo
 ./setup.sh
 ```
 
-**Setup time**: 5-10 minutes (mostly waiting for containers to start)
+The script creates a Kind cluster, deploys the LGTP stack with OpenTelemetry Collector, builds and deploys the microservices, provisions dashboards, and generates some initial telemetry.
 
-The script will:
-1. ✅ Create a Kind Kubernetes cluster
-2. ✅ Deploy the complete Grafana LGTP stack (Loki, Grafana, Tempo, Prometheus)
-3. ✅ Deploy OpenTelemetry Collector
-4. ✅ Build and deploy demo microservices
-5. ✅ Provision professional dashboards
-6. ✅ Generate sample telemetry data
+### DNS configuration
 
-### Configure DNS
-
-Add to your `/etc/hosts`:
+Add to `/etc/hosts`:
 
 ```bash
 127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost
 ```
 
-**Quick command:**
+Or run:
 ```bash
 echo '127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example-localhost' | sudo tee -a /etc/hosts
 ```
 
-### Access the Platform
+### Access
 
-🎨 **Grafana Dashboard**: http://grafana-otel-demo.localhost
+Grafana: http://grafana-otel-demo.localhost
 ```
 User:     admin
 Password: Mikroways123
 ```
 
-🛍️ **Products Service** (Node.js): http://otel-example.localhost  
-🛒 **Orders Service** (Python): http://python-otel-example.localhost
+Products Service (Node.js): http://otel-example.localhost
+Orders Service (Python): http://python-otel-example.localhost
 
 ---
 
-## 🏗️ Architecture
-
-This demo simulates a realistic e-commerce platform with two microservices:
+## Architecture
 
 ```mermaid
 graph LR
     User((User))
     Ingress[Nginx Ingress]
-    
+
     subgraph Cluster [Kind Cluster]
         direction TB
-        Ingress --> |HTTP| ProductSvc[Product Service<br/>Node.js]
-        Ingress --> |HTTP| OrderSvc[Order Service<br/>Python]
-        
+        Ingress --> |HTTP| ProductSvc[Product Service<br/>Node.js v2.0]
+        Ingress --> |HTTP| OrderSvc[Order Service<br/>Python v2.0]
+
         OrderSvc -.-> |REST /api/products/:id| ProductSvc
-        
+        OrderSvc -.-> |REST /api/inventory/:id| ProductSvc
+        OrderSvc -.-> |REST /api/products/:id/purchase| ProductSvc
+
         ProductSvc --> |OTLP| Collector[OTEL Collector]
         OrderSvc --> |OTLP| Collector
-        
+
         subgraph LGTP [Grafana LGTP Stack]
             direction TB
             Collector --> |Traces| Tempo[Tempo]
             Collector --> |Logs| Loki[Loki]
             Collector --> |Metrics| Prometheus[Prometheus]
-            
+
             Tempo -.-> Grafana[Grafana<br/>Visualization]
             Loki -.-> Grafana
             Prometheus -.-> Grafana
         end
     end
-    
+
     style ProductSvc fill:#f9f,stroke:#333,stroke-width:2px
     style OrderSvc fill:#bbf,stroke:#333,stroke-width:2px
     style Grafana fill:#dfd,stroke:#333,stroke-width:2px
-    style Tempo fill:#eee,stroke:#333,stroke-dasharray: 5 5
-    style Loki fill:#eee,stroke:#333,stroke-dasharray: 5 5
-    style Prometheus fill:#eee,stroke:#333,stroke-dasharray: 5 5
 ```
 
-### Service Communication Flow
-
-When a user creates an order, you'll see distributed tracing in action:
+When you create an order, the trace propagates from Orders to Products:
 
 ```
-User Request → Orders Service → Products Service
-                      ↓                ↓
+User Request -> Orders Service -> Products Service
+                      |                |
                    [Span 1]        [Span 2]
-                      ↓                ↓
-              OTEL Collector ← OTEL Collector
-                      ↓
+                      |                |
+              OTEL Collector <- OTEL Collector
+                      |
                  Tempo (Traces)
                  Loki (Logs with trace_id)
                  Prometheus (Metrics)
-                      ↓
-                  Grafana (Visualization)
+                      |
+                  Grafana
 ```
 
 ---
 
-## 🧪 Exploring the Demo
+## API reference
 
-### 1. View Pre-configured Dashboards
+### Products service
 
-Navigate to **Dashboards → Browse** in Grafana. You'll find:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/products` | GET | List products with filtering and sorting |
+| `/api/products/search?q=query` | GET | Search by name, description, tags |
+| `/api/products/:id` | GET | Get product details |
+| `/api/products/:id/reviews` | GET | Get reviews |
+| `/api/products/:id/recommendations` | GET | Get similar products |
+| `/api/products/:id/purchase` | POST | Process purchase |
+| `/api/inventory/:productId` | GET | Check inventory |
+| `/api/categories` | GET | List categories |
+| `/api/stats` | GET | Service stats |
+| `/health` | GET | Health check |
 
-#### 📊 **Service Overview Dashboard**
-- Request rate (req/s) by service
-- Error rate with threshold alerts
-- Response latency percentiles (p50, p95, p99)
-- Top endpoints by traffic
-- Detailed endpoint statistics table
+Query parameters for `/api/products`:
+- `category` - electronics, accessories, stationery
+- `minPrice` / `maxPrice` - price range
+- `minRating` - minimum rating
+- `sort` - price_asc, price_desc, rating, popularity
+- `limit` / `offset` - pagination
 
-#### 🔍 **Distributed Tracing Dashboard**
-- Recent traces from both services
-- Span duration distribution
-- Spans per second
-- TraceQL search interface
+### Orders service
 
-#### 📝 **Logs Analysis Dashboard**
-- Log volume by service
-- Log level distribution (INFO, WARNING, ERROR)
-- Recent error logs
-- Logs with trace context for correlation
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/orders` | POST | Create order |
+| `/api/orders/:id` | GET | Get order details |
+| `/api/orders/:id/track` | GET | Track order |
+| `/api/orders/:id/cancel` | POST | Cancel order |
+| `/api/orders/user/:userId` | GET | User order history |
+| `/api/stats` | GET | Service stats |
+| `/health` | GET | Health check |
 
-### 2. Generate Traffic
+---
 
-Create realistic e-commerce activity:
+## Using the demo
+
+### Generate traffic
 
 ```bash
-# Browse product catalog
-curl http://otel-example.localhost/api/products
+# Full traffic simulation (100 iterations)
+./generate-traffic.sh
 
-# View a specific product (creates trace + logs + metrics)
-curl http://otel-example.localhost/api/products/1
+# Custom options
+ITERATIONS=200 DELAY=0.3 ./generate-traffic.sh
 
-# Create an order (triggers inter-service call!)
+# Continuous traffic
+./quick-traffic.sh
+
+# Burst mode (flash sale simulation)
+./quick-traffic.sh --burst
+
+# Fast mode
+./quick-traffic.sh --fast
+```
+
+### Manual API calls
+
+```bash
+# List products with filtering
+curl "http://otel-example.localhost/api/products?category=electronics&sort=popularity"
+
+# Search
+curl "http://otel-example.localhost/api/products/search?q=wireless"
+
+# Recommendations
+curl "http://otel-example.localhost/api/products/1/recommendations"
+
+# Reviews
+curl "http://otel-example.localhost/api/products/3/reviews"
+
+# Create an order (this triggers cross-service tracing)
 curl -X POST http://python-otel-example.localhost/api/orders \
   -H 'Content-Type: application/json' \
   -d '{"product_id": 3, "quantity": 2, "user_id": "user-42"}'
 
-# Check order status
-curl http://python-otel-example.localhost/api/orders/ORD-00001
+# Track order
+curl "http://python-otel-example.localhost/api/orders/ORD-00001/track"
 
-# Get all orders for a user
-curl http://python-otel-example.localhost/api/orders/user/user-42
+# User history
+curl "http://python-otel-example.localhost/api/orders/user/user-42"
+
+# Stats
+curl "http://otel-example.localhost/api/stats"
+curl "http://python-otel-example.localhost/api/stats"
 ```
 
-### 3. See Distributed Tracing in Action
+### Dashboards
 
-**Try this workflow:**
+Go to Dashboards -> Browse in Grafana:
 
-1. Create an order using the curl command above
-2. Go to Grafana → **Explore** → Select **Tempo**
+**Executive** - Revenue metrics, SLA violations, conversion funnel, cart abandonment
+
+**Service overview** - Request rate, error rate, latency percentiles (p50/p95/p99), cache hit ratio, circuit breaker state
+
+**Distributed tracing** - Recent traces, span duration, TraceQL search, span events
+
+**Logs analysis** - Log volume by service, log level distribution, logs with trace context
+
+### Viewing distributed traces
+
+1. Create an order with the curl command above
+2. In Grafana, go to Explore -> Tempo
 3. Search for service: `orders-service`
-4. Click on a recent trace
-5. **Notice:** You'll see spans from BOTH services in one trace!
-   - Orders Service: create-order, fetch-product-details, validate-inventory, complete-purchase
-   - Products Service: get-product-by-id, check-inventory, purchase-product
+4. Click a trace
+5. You'll see spans from both services in one trace:
+   - Orders: create-order, fetch-product-details, validate-inventory, complete-purchase
+   - Products: get-product-by-id, check-inventory, purchase-product
+6. Look for span events like `purchase_initiated`, `payment_successful`, `order_created`
 
-This shows the power of distributed tracing across microservices!
+### Metrics queries
 
-### 4. Correlate Logs with Traces
+In Grafana -> Explore -> Prometheus:
 
-**Try this correlation workflow:**
-
-1. Go to Grafana → **Explore** → Select **Loki**
-2. Query: `{service_name="orders-service"} | json | level="INFO"`
-3. Find a log entry with a `trace_id`
-4. **Click on the trace_id link** → It jumps to the trace in Tempo!
-5. In the trace view, **click "Logs for this span"** → Back to Loki!
-
-This demonstrates the seamless correlation between logs and traces.
-
-### 5. Explore Metrics 
-
-Go to Grafana → **Explore** → Select **Prometheus**
-
-Try these queries:
 ```promql
 # Request rate by service
-sum(rate(http_requests_total[5m])) by (service_name)
+sum(rate(http_requests_total[5m])) by (exported_job)
 
 # Error rate
 sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
 
-# Product views
-rate(products_viewed_total[5m])
+# p95 latency
+histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le, endpoint))
+
+# Cache hit ratio
+cache_hit_ratio{cache_name="product_cache"}
 
 # Orders created
 rate(orders_created_total[5m])
+
+# Revenue
+sum(increase(order_revenue_dollars_sum[1h]))
+
+# Cart abandonment
+sum(rate(cart_abandonment_total[5m])) by (reason)
 ```
 
 ---
 
-## 🎓 Key Concepts Demonstrated
+## What this demo covers
 
-### OpenTelemetry Standards
-- ✅ **OTLP Protocol** for telemetry export
-- ✅ **Semantic Conventions** for consistent attribute naming
-- ✅ **Context Propagation** across service boundaries
-- ✅ **Multi-language support** (Node.js + Python)
+**OpenTelemetry**: OTLP protocol, semantic conventions, context propagation, span events, multi-language instrumentation (Node.js + Python)
 
-### Observability Patterns
-- ✅ **RED Metrics** (Rate, Errors, Duration)
-- ✅ **Structured Logging** with JSON
-- ✅ **Trace Context in Logs** (trace_id, span_id)
-- ✅ **Custom Metrics** (business KPIs like purchases, inventory)
-- ✅ **Distributed Tracing** across microservices
+**Observability patterns**: RED metrics (Rate/Errors/Duration), structured JSON logging, trace context in logs, custom business metrics, distributed tracing
 
-### Grafana LGTP Stack
-- ✅ **Loki** for log aggregation
-- ✅ **Grafana** for visualization
-- ✅ **Tempo** for distributed tracing
-- ✅ **Prometheus** (replacing Mimir) for metrics storage
+**Resilience patterns**: Circuit breakers, rate limiting, retry with backoff, caching with TTL, health checks
+
+**Grafana stack**: Loki for logs, Tempo for traces, Prometheus for metrics, Grafana for visualization
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Pods not starting
 
 ```bash
-# Check pod status
 kubectl get pods -n monitoring
 kubectl get pods -n demo
-
-# View logs
 kubectl logs -n monitoring <pod-name>
 kubectl logs -n demo <pod-name>
 ```
 
 ### Can't access Grafana
 
-1. Check ingress is running:
+1. Check ingress:
    ```bash
    kubectl get pods -n ingress-nginx
    ```
 
-2. Verify /etc/hosts entry exists
+2. Verify /etc/hosts entry
 
-3. Try accessing via port-forward:
+3. Try port-forward:
    ```bash
    kubectl port-forward -n monitoring svc/grafana 3000:80
-   # Then access http://localhost:3000
+   # Access http://localhost:3000
    ```
 
 ### No data in dashboards
 
-1. Check OTEL Collector is running:
+1. Check collector:
    ```bash
    kubectl get pods -n monitoring | grep otel-collector
    ```
 
-2. Generate more traffic (run the curl commands above)
+2. Generate traffic:
+   ```bash
+   ./quick-traffic.sh
+   ```
 
-3. Check collector logs:
+3. Check logs:
    ```bash
    kubectl logs -n monitoring -l app.kubernetes.io/name=opentelemetry-collector
    ```
 
-### Services not communicating
-
-Check service DNS resolution inside Orders Service:
-```bash
-kubectl exec -n demo deployment/otel-python-app -- curl http://otel-demo-app:8080/health
-```
-
 ---
 
-## 🧹 Cleanup
-
-Remove everything:
+## Cleanup
 
 ```bash
 kind delete cluster --name grafana-otel-demo
-```
-
-Remove /etc/hosts entries:
-```bash
 sudo sed -i '/grafana-otel-demo.localhost/d' /etc/hosts
 ```
 
 ---
 
-## 📚 Learn More
+## Links
 
-- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [OpenTelemetry docs](https://opentelemetry.io/docs/)
 - [Grafana Tempo](https://grafana.com/oss/tempo/)
 - [Grafana Loki](https://grafana.com/oss/loki/)
 - [Prometheus](https://prometheus.io/)
 
 ---
 
-## 🤝 Contributing
+## License
 
-Found an issue or have an improvement? Pull requests are welcome!
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file
-
----
-
-**Built for demonstration and learning purposes**  
-Questions? Open an issue or reach out!
-
+MIT - see [LICENSE](LICENSE)
