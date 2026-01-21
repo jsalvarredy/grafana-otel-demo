@@ -293,9 +293,7 @@ data:
       "style": "dark",
       "tags": [
         "loki",
-        "logs",
-        "poc",
-        "v3"
+        "logs"
       ],
       "templating": {
         "list": [
@@ -345,7 +343,7 @@ data:
       },
       "timepicker": {},
       "timezone": "",
-      "title": "Super Logs Dashboard V3 (Pro)",
+      "title": "Log Analysis",
       "uid": "super-logs-poc-v3",
       "version": 1,
       "weekStart": ""

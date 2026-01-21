@@ -47,7 +47,9 @@ print_info() {
 
 # Start
 clear
-print_header "🚀 Grafana LGTP + OpenTelemetry Demo Setup"
+print_header "Grafana LGTP + OpenTelemetry Demo Setup"
+echo ""
+print_info "Setup will take approximately 5-10 minutes depending on your internet connection."
 echo ""
 
 # ============================================================================
@@ -110,7 +112,7 @@ echo ""
 # ============================================================================
 # DEPLOY INFRASTRUCTURE VIA HELMFILE
 # ============================================================================
-print_header "📦 Deploying Observability Stack"
+print_header "Deploying Observability Stack"
 echo ""
 
 print_step "Creating monitoring namespace..."
@@ -138,7 +140,7 @@ echo ""
 # ============================================================================
 # DASHBOARD PROVISIONING
 # ============================================================================
-print_header "📊 Provisioning Grafana Dashboards"
+print_header "Provisioning Grafana Dashboards"
 echo ""
 
 print_step "Applying dashboard ConfigMaps..."
@@ -155,7 +157,7 @@ echo ""
 # ============================================================================
 # BUILD AND DEPLOY DEMO APPLICATIONS
 # ============================================================================
-print_header "🏗️  Building and Deploying Demo Applications"
+print_header "Building and Deploying Demo Applications"
 echo ""
 
 print_step "Building Products Service (Node.js)..."
@@ -206,9 +208,38 @@ print_success "Services are ready"
 echo ""
 
 # ============================================================================
+# POST-DEPLOY VERIFICATION
+# ============================================================================
+print_header "Verifying Deployment"
+echo ""
+
+verify_deployment() {
+    local ns=$1
+    local label=$2
+    local name=$3
+
+    if kubectl get pods -n "$ns" -l "$label" 2>/dev/null | grep -q "Running"; then
+        print_success "$name is running"
+    else
+        print_warning "$name may not be ready yet"
+    fi
+    return 0
+}
+
+verify_deployment "monitoring" "app.kubernetes.io/name=grafana" "Grafana"
+verify_deployment "monitoring" "app.kubernetes.io/name=prometheus" "Prometheus"
+verify_deployment "monitoring" "app.kubernetes.io/name=loki" "Loki"
+verify_deployment "monitoring" "app.kubernetes.io/name=tempo" "Tempo"
+verify_deployment "monitoring" "app.kubernetes.io/name=opentelemetry-collector" "OpenTelemetry Collector"
+verify_deployment "demo" "app.kubernetes.io/name=otel-demo-app" "Products Service"
+verify_deployment "demo" "app.kubernetes.io/name=otel-python-app" "Orders Service"
+
+echo ""
+
+# ============================================================================
 # GENERATE SAMPLE TRAFFIC
 # ============================================================================
-print_header "🎲 Generating Sample Observability Data"
+print_header "Generating Sample Observability Data"
 echo ""
 
 print_info "Simulating realistic e-commerce traffic patterns..."
@@ -272,7 +303,7 @@ echo ""
 # ============================================================================
 # DNS CONFIGURATION REMINDER
 # ============================================================================
-print_header "🌐 Access Information"
+print_header "Access Information"
 echo ""
 
 # Check if entries exist in /etc/hosts
@@ -294,57 +325,43 @@ fi
 # ============================================================================
 # SETUP COMPLETE
 # ============================================================================
-print_header "✅ Setup Complete!"
+print_header "Setup Complete"
 echo ""
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║          🎯 Your Observability Demo is Ready!             ║${NC}"
+echo -e "${GREEN}║            Your Observability Stack is Ready               ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-echo -e "${CYAN}📊 Grafana Dashboard:${NC}"
+echo -e "${CYAN}Grafana Dashboard:${NC}"
 echo -e "   URL:      ${BLUE}http://grafana-otel-demo.localhost${NC}"
 echo -e "   User:     ${YELLOW}admin${NC}"
 echo -e "   Password: ${YELLOW}Mikroways123${NC}"
 echo ""
 
-echo -e "${CYAN}🛍️  Demo Services:${NC}"
+echo -e "${CYAN}Demo Services:${NC}"
 echo -e "   Products Service: ${BLUE}http://otel-example.localhost${NC}"
 echo -e "   Orders Service:   ${BLUE}http://python-otel-example.localhost${NC}"
 echo ""
 
-echo -e "${CYAN}🔍 What to Explore in Grafana:${NC}"
-echo -e "   ${GREEN}1.${NC} Dashboards → Browse"
-echo -e "      • ${MAGENTA}Service Overview${NC} - RED metrics for all services"
-echo -e "      • ${MAGENTA}Distributed Tracing${NC} - View request flows across services"
-echo -e "      • ${MAGENTA}Logs Analysis${NC} - Structured logs with trace correlation"
-echo ""
-echo -e "   ${GREEN}2.${NC} Explore → Data Sources"
-echo -e "      • ${MAGENTA}Prometheus${NC} - Query metrics like ${YELLOW}http_requests_total${NC}"
-echo -e "      • ${MAGENTA}Loki${NC} - Search logs with ${YELLOW}{service_name=\"products-service\"}${NC}"
-echo -e "      • ${MAGENTA}Tempo${NC} - Search traces and click through to logs"
-echo ""
-echo -e "   ${GREEN}3.${NC} Try correlating:"
-echo -e "      • Find a trace_id in logs → Jump to Tempo"
-echo -e"      • Click on a trace span → View related logs"
-echo -e "      • See how Orders Service calls Products Service"
+echo -e "${CYAN}Quick Start:${NC}"
+echo -e "   1. Open Grafana and explore the pre-built dashboards"
+echo -e "   2. Generate traffic: ${YELLOW}./traffic.sh${NC}"
+echo -e "   3. View traces in Tempo, logs in Loki, metrics in Prometheus"
 echo ""
 
-echo -e "${CYAN}🎮 Generate More Traffic:${NC}"
-echo -e "   ${YELLOW}# Browse products${NC}"
-echo -e "   curl http://otel-example.localhost/api/products"
-echo ""
-echo -e "   ${YELLOW}# Create an order (triggers inter-service call)${NC}"
-echo -e "   curl -X POST http://python-otel-example.localhost/api/orders \\"
-echo -e "     -H 'Content-Type: application/json' \\"
-echo -e "     -d '{\"product_id\": 1, \"quantity\": 1, \"user_id\": \"user-123\"}'"
+echo -e "${CYAN}Documentation:${NC}"
+echo -e "   API Reference:    docs/API.md"
+echo -e "   Troubleshooting:  docs/TROUBLESHOOTING.md"
+echo -e "   Production Guide: docs/PRODUCTION.md"
+echo -e "   Cost Analysis:    docs/COST_ANALYSIS.md"
 echo ""
 
-echo -e "${CYAN}🧹 Cleanup:${NC}"
+echo -e "${CYAN}Cleanup:${NC}"
 echo -e "   kind delete cluster --name grafana-otel-demo"
 echo ""
 
-print_success "Happy Observing! 🚀"
+print_success "Setup complete. See README.md for next steps."
 echo ""
 
 
