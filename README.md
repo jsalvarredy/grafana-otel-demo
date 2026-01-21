@@ -63,37 +63,7 @@ See [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) for detailed breakdown.
 
 ## Architecture
 
-```
-                    ┌─────────────────────────────────────────────┐
-                    │              Your Infrastructure             │
-                    │  ┌─────────────────────────────────────────┐ │
-                    │  │           Demo Applications              │ │
-                    │  │  ┌──────────────┐  ┌──────────────────┐ │ │
-                    │  │  │   Products   │  │     Orders       │ │ │
-                    │  │  │   (Node.js)  │──│    (Python)      │ │ │
-                    │  │  └──────┬───────┘  └────────┬─────────┘ │ │
-                    │  └─────────┼────────────────────┼──────────┘ │
-                    │            │      OTLP          │            │
-                    │            ▼                    ▼            │
-                    │  ┌─────────────────────────────────────────┐ │
-                    │  │         OpenTelemetry Collector          │ │
-                    │  └──────┬──────────┬──────────────┬────────┘ │
-                    │         │          │              │          │
-                    │    Metrics      Traces         Logs          │
-                    │         │          │              │          │
-                    │         ▼          ▼              ▼          │
-                    │  ┌──────────┐ ┌─────────┐ ┌───────────┐     │
-                    │  │Prometheus│ │  Tempo  │ │   Loki    │     │
-                    │  └────┬─────┘ └────┬────┘ └─────┬─────┘     │
-                    │       └────────────┼───────────┘            │
-                    │                    ▼                         │
-                    │              ┌──────────┐                    │
-                    │              │ Grafana  │                    │
-                    │              └──────────┘                    │
-                    │                                              │
-                    │    Data never leaves your infrastructure     │
-                    └──────────────────────────────────────────────┘
-```
+![Architecture](docs/Architecture.jpg)
 
 ## This is a Demo
 
