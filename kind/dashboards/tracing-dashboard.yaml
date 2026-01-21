@@ -32,7 +32,7 @@ data:
      "liveNow": false,
      "panels": [
        {
-         "content": "# 🚀 Distributed Tracing PoC\n\nThis dashboard provides a high-level view of the tracing telemetry stored in **Tempo**.\n\nIt is focused on two main services:\n* **orders-service**\n* **products-service**\n\nUse the panels below to quickly identify **Errors** (500s) and **High Latency** events.",
+         "content": "# Distributed Tracing\n\nView tracing telemetry stored in **Tempo**.\n\nServices monitored:\n* **orders-service**\n* **products-service**\n\nUse the panels below to identify **Errors** (500s) and **High Latency** events.",
          "gridPos": {
            "h": 4,
            "w": 24,
@@ -327,8 +327,7 @@ data:
      "style": "dark",
      "tags": [
        "tempo",
-       "traces",
-       "poc"
+       "traces"
      ],
      "templating": {
        "list": [
@@ -358,7 +357,7 @@ data:
      },
      "timepicker": {},
      "timezone": "",
-     "title": "Super Traces Dashboard (PoC)",
+     "title": "Distributed Tracing",
      "uid": "super-traces-poc-v1",
      "version": 1,
      "weekStart": ""
