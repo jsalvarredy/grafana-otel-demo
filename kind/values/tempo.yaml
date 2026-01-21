@@ -1,14 +1,15 @@
 tempo:
   repository: grafana/tempo
   tag: latest
-  
+  extraArgs:
+    mem-ballast-size-mbs: 128
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
+      cpu: 100m
       memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
 
 storage:
   trace:
