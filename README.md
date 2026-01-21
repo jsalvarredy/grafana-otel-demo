@@ -29,7 +29,7 @@ If any of these apply to you, keep reading:
 ## Quick Start
 
 ```bash
-git clone https://github.com/Mikroways/grafana-otel-demo
+git clone https://github.com/jsalvarredy/grafana-otel-demo
 cd grafana-otel-demo
 ./setup.sh
 ```
@@ -158,18 +158,6 @@ For production deployment guidance, see [docs/PRODUCTION.md](docs/PRODUCTION.md)
 ```bash
 kind delete cluster --name grafana-otel-demo
 ```
-
-## Professional Services
-
-Mikroways provides enterprise support for this stack:
-
-- **Production deployment** - Sizing, HA configuration, security hardening
-- **Custom instrumentation** - OpenTelemetry integration for your services
-- **Dashboard development** - Business-specific observability dashboards
-- **Training** - Grafana, PromQL, LogQL, TraceQL for your team
-- **Support contracts** - Ongoing maintenance and incident support
-
-**Contact**: [mikroways.net/contact](https://mikroways.net/contact/)
 
 ## License
 

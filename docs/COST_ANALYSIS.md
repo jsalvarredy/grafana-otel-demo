@@ -81,8 +81,6 @@ For a production-grade setup supporting 50 monitored hosts:
 
 With internal team: factor 0.5-1 FTE for observability platform management.
 
-With Mikroways support: reduced to ~0.1 FTE oversight.
-
 ---
 
 ## Total Cost of Ownership (3 Years)
@@ -193,13 +191,3 @@ ROI: 64%
 3. **Calculate your costs** - Use numbers above as baseline
 4. **Plan migration** - Start with non-critical workloads
 
-### Need a Custom Analysis?
-
-Mikroways can provide a detailed cost analysis for your specific environment, including:
-
-- Current SaaS spend analysis
-- Infrastructure sizing for your workload
-- Migration timeline and effort estimate
-- Ongoing support options
-
-Contact: https://mikroways.net/contacto/

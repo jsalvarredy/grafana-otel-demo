@@ -193,16 +193,5 @@ Key metrics to watch:
 4. **Set up CI/CD** for Helm deployments
 5. **Configure alerting rules**
 
----
 
-## Need Help?
 
-Mikroways provides professional services for production deployments:
-
-- Architecture design and sizing
-- Production deployment and hardening
-- Custom instrumentation for your services
-- Training for your team
-- Ongoing support
-
-Contact: https://mikroways.net/contacto/
