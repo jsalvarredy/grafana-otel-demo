@@ -1,8 +1,7 @@
 tempo:
   repository: grafana/tempo
-  tag: latest
-  extraArgs:
-    mem-ballast-size-mbs: 128
+  tag: 2.8.0
+  memBallastSizeMbs: 64
   resources:
     requests:
       cpu: 100m
