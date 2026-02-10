@@ -101,13 +101,15 @@ This demo showcases two instrumentation strategies side by side:
 
 See [docs/BEYLA.md](docs/BEYLA.md) for a deep dive on Beyla and when to use each approach.
 
-### Pre-built Dashboards (6 included)
+### Pre-built Dashboards (8 included)
 - Kubernetes Cluster Overview
 - Logs Search
 - Service Overview (RED metrics)
 - Distributed Tracing
 - Log Analysis
 - Executive Summary
+- Observability Overview
+- SLO/SLI Error Budget
 
 ### Traffic Generator
 ```bash
