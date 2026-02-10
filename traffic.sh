@@ -14,8 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Configuration
-PRODUCTS_HOST="${PRODUCTS_HOST:-otel-example.localhost}"
-ORDERS_HOST="${ORDERS_HOST:-python-otel-example.localhost}"
+PRODUCTS_HOST="${PRODUCTS_HOST:-products.127.0.0.1.nip.io}"
+ORDERS_HOST="${ORDERS_HOST:-orders.127.0.0.1.nip.io}"
+SHIPPING_HOST="${SHIPPING_HOST:-shipping.127.0.0.1.nip.io}"
 BASE_URL="${BASE_URL:-http://localhost}"
 MODE="finite"
 ITERATIONS=50
@@ -28,6 +29,8 @@ failed_orders=0
 products_viewed=0
 searches=0
 errors=0
+shipments_created=0
+quotes_requested=0
 start_time=$(date +%s)
 
 # -----------------------------------------------------------------------------
@@ -187,10 +190,39 @@ scenario_burst() {
     done
 }
 
+# Request shipping quote and create shipment
+scenario_shipping() {
+    local weight=$((RANDOM % 50 + 1))
+    local cities=("New York" "Los Angeles" "Chicago" "Houston" "Miami")
+    local origin=${cities[$((RANDOM % ${#cities[@]}))]}
+    local dest=${cities[$((RANDOM % ${#cities[@]}))]}
+
+    local quote_data="{\"origin\": \"${origin}\", \"destination\": \"${dest}\", \"weight\": ${weight}}"
+    request "$SHIPPING_HOST" "/api/shipping/quote" "POST" "$quote_data" > /dev/null
+    ((quotes_requested++)) || true
+
+    if (( RANDOM % 2 == 0 )); then
+        local order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
+        local ship_data="{\"order_id\": \"${order_id}\", \"origin\": \"${origin}\", \"destination\": \"${dest}\", \"weight\": ${weight}}"
+        request "$SHIPPING_HOST" "/api/shipping/create" "POST" "$ship_data" > /dev/null
+        ((shipments_created++)) || true
+    fi
+}
+
+# Track an existing shipment
+scenario_track_shipment() {
+    local tracking_id=$(printf "SHP-%05d" $((RANDOM % 500 + 1)))
+    request "$SHIPPING_HOST" "/api/shipping/track/${tracking_id}" > /dev/null
+
+    local order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
+    request "$SHIPPING_HOST" "/api/shipping/order/${order_id}" > /dev/null
+}
+
 # Health checks
 check_health() {
     request "$PRODUCTS_HOST" "/health" > /dev/null
     request "$ORDERS_HOST" "/health" > /dev/null
+    request "$SHIPPING_HOST" "/api/health" > /dev/null 2>&1 || true
 }
 
 # -----------------------------------------------------------------------------
@@ -201,21 +233,27 @@ run_iteration() {
     local scenario=$((RANDOM % 100))
 
     # Traffic distribution:
-    # 40% - Browse products
-    # 25% - Search/filter
-    # 20% - Place orders
-    # 10% - Check order status
-    # 3%  - Errors
-    # 2%  - Burst traffic
+    # 30% - Browse products
+    # 20% - Search/filter
+    # 15% - Place orders
+    # 15% - Shipping (quote + create)
+    #  8% - Check order status
+    #  5% - Track shipment
+    #  5% - Errors
+    #  2% - Burst traffic
 
-    if (( scenario < 40 )); then
+    if (( scenario < 30 )); then
         scenario_browse
-    elif (( scenario < 65 )); then
+    elif (( scenario < 50 )); then
         scenario_search
-    elif (( scenario < 85 )); then
+    elif (( scenario < 65 )); then
         scenario_order
-    elif (( scenario < 95 )); then
+    elif (( scenario < 80 )); then
+        scenario_shipping
+    elif (( scenario < 88 )); then
         scenario_order_status
+    elif (( scenario < 93 )); then
+        scenario_track_shipment
     elif (( scenario < 98 )); then
         scenario_error
     else
@@ -238,12 +276,16 @@ print_stats() {
     echo -e "    Successful:    ${GREEN}${successful_orders}${NC}"
     echo -e "    Failed:        ${RED}${failed_orders}${NC}"
     echo ""
+    echo -e "  ${GREEN}Shipping${NC}"
+    echo -e "    Quotes:          ${GREEN}${quotes_requested}${NC}"
+    echo -e "    Shipments:       ${GREEN}${shipments_created}${NC}"
+    echo ""
     echo -e "  ${CYAN}Activity${NC}"
     echo -e "    Products viewed: ${CYAN}${products_viewed}${NC}"
     echo -e "    Searches:        ${CYAN}${searches}${NC}"
     echo -e "    Errors tested:   ${YELLOW}${errors}${NC}"
     echo ""
-    echo -e "  View telemetry in Grafana: ${BLUE}http://grafana-otel-demo.localhost${NC}"
+    echo -e "  View telemetry in Grafana: ${BLUE}http://grafana.127.0.0.1.nip.io${NC}"
     echo ""
 }
 
@@ -299,8 +341,9 @@ done
 
 print_header "Traffic Generator"
 echo ""
-echo -e "  Products Service: ${CYAN}${PRODUCTS_HOST}${NC}"
-echo -e "  Orders Service:   ${CYAN}${ORDERS_HOST}${NC}"
+echo -e "  Products Service:  ${CYAN}${PRODUCTS_HOST}${NC}"
+echo -e "  Orders Service:    ${CYAN}${ORDERS_HOST}${NC}"
+echo -e "  Shipping Service:  ${CYAN}${SHIPPING_HOST}${NC}"
 echo -e "  Mode:             ${CYAN}${MODE}${NC}"
 echo -e "  Delay:            ${CYAN}${DELAY}s${NC}"
 if [ "$MODE" = "finite" ]; then
@@ -326,6 +369,12 @@ if ! curl -s -o /dev/null --max-time 5 -H "Host: $ORDERS_HOST" "${BASE_URL}/heal
     echo -e "${RED}Error: Cannot reach Orders Service at ${BASE_URL}${NC}"
     echo -e "Make sure the cluster is running and /etc/hosts is configured."
     exit 1
+fi
+echo -n "."
+if ! curl -s -o /dev/null --max-time 5 -H "Host: $SHIPPING_HOST" "${BASE_URL}/api/health" 2>/dev/null; then
+    echo ""
+    echo -e "${YELLOW}Warning: Cannot reach Shipping Service at ${BASE_URL}${NC}"
+    echo -e "Shipping scenarios will be skipped. This is non-fatal."
 fi
 echo -e " ${GREEN}OK${NC}"
 echo ""

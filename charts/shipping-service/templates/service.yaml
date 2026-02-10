@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shipping-service.fullname" . }}
+  labels:
+    {{- include "shipping-service.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- if .Values.beyla.enabled }}
+    - port: 9090
+      targetPort: beyla-metrics
+      protocol: TCP
+      name: beyla-metrics
+    {{- end }}
+  selector:
+    {{- include "shipping-service.selectorLabels" . | nindent 4 }}

@@ -4,7 +4,7 @@ This document describes the REST APIs exposed by the demo microservices.
 
 ## Products Service (Node.js)
 
-Base URL: `http://otel-example.localhost`
+Base URL: `http://products.127.0.0.1.nip.io`
 
 ### Endpoints
 
@@ -37,23 +37,23 @@ Base URL: `http://otel-example.localhost`
 
 ```bash
 # List products with filtering
-curl "http://otel-example.localhost/api/products?category=electronics&sort=popularity"
+curl "http://products.127.0.0.1.nip.io/api/products?category=electronics&sort=popularity"
 
 # Search products
-curl "http://otel-example.localhost/api/products/search?q=wireless"
+curl "http://products.127.0.0.1.nip.io/api/products/search?q=wireless"
 
 # Get recommendations
-curl "http://otel-example.localhost/api/products/1/recommendations"
+curl "http://products.127.0.0.1.nip.io/api/products/1/recommendations"
 
 # Get reviews
-curl "http://otel-example.localhost/api/products/3/reviews"
+curl "http://products.127.0.0.1.nip.io/api/products/3/reviews"
 ```
 
 ---
 
 ## Orders Service (Python)
 
-Base URL: `http://python-otel-example.localhost`
+Base URL: `http://orders.127.0.0.1.nip.io`
 
 ### Endpoints
 
@@ -81,18 +81,83 @@ Base URL: `http://python-otel-example.localhost`
 
 ```bash
 # Create an order (triggers cross-service tracing)
-curl -X POST http://python-otel-example.localhost/api/orders \
+curl -X POST http://orders.127.0.0.1.nip.io/api/orders \
   -H 'Content-Type: application/json' \
   -d '{"product_id": 3, "quantity": 2, "user_id": "user-42"}'
 
 # Track order
-curl "http://python-otel-example.localhost/api/orders/ORD-00001/track"
+curl "http://orders.127.0.0.1.nip.io/api/orders/ORD-00001/track"
 
 # User history
-curl "http://python-otel-example.localhost/api/orders/user/user-42"
+curl "http://orders.127.0.0.1.nip.io/api/orders/user/user-42"
 
 # Service stats
-curl "http://python-otel-example.localhost/api/stats"
+curl "http://orders.127.0.0.1.nip.io/api/stats"
+```
+
+---
+
+## Shipping Service (Java + Beyla eBPF)
+
+Base URL: `http://shipping.127.0.0.1.nip.io`
+
+This service has **no OTEL SDK**. All telemetry (traces and metrics) is captured automatically by a Beyla eBPF sidecar.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/` | GET | Service info |
+| `/api/health` | GET | Health check |
+| `/api/shipping/quote` | POST | Get shipping quote |
+| `/api/shipping/create` | POST | Create shipment |
+| `/api/shipping/track/:trackingId` | GET | Track shipment |
+| `/api/shipping/order/:orderId` | GET | Get shipment by order |
+| `/api/slow` | GET | Slow endpoint (for testing) |
+| `/api/error` | GET | Error endpoint (for testing) |
+
+### Get Shipping Quote Request
+
+```json
+{
+  "origin": "New York",
+  "destination": "Los Angeles",
+  "weight": 25
+}
+```
+
+### Create Shipment Request
+
+```json
+{
+  "order_id": "ORD-00042",
+  "origin": "New York",
+  "destination": "Los Angeles",
+  "weight": 25
+}
+```
+
+### Examples
+
+```bash
+# Get a shipping quote
+curl -X POST http://shipping.127.0.0.1.nip.io/api/shipping/quote \
+  -H 'Content-Type: application/json' \
+  -d '{"origin": "New York", "destination": "Los Angeles", "weight": 25}'
+
+# Create a shipment
+curl -X POST http://shipping.127.0.0.1.nip.io/api/shipping/create \
+  -H 'Content-Type: application/json' \
+  -d '{"order_id": "ORD-00042", "origin": "New York", "destination": "Los Angeles", "weight": 25}'
+
+# Track a shipment
+curl "http://shipping.127.0.0.1.nip.io/api/shipping/track/SHP-00001"
+
+# Get shipment by order
+curl "http://shipping.127.0.0.1.nip.io/api/shipping/order/ORD-00042"
+
+# Health check
+curl "http://shipping.127.0.0.1.nip.io/api/health"
 ```
 
 ---

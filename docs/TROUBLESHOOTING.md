@@ -30,13 +30,12 @@ kubectl get pods -n ingress-nginx
 kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
 ```
 
-### 2. Verify /etc/hosts Entry
+### 2. Verify DNS Resolution
 
 ```bash
-grep grafana-otel-demo.localhost /etc/hosts
+# nip.io should resolve automatically to 127.0.0.1
+nslookup grafana.127.0.0.1.nip.io
 ```
-
-Should show: `127.0.0.1 grafana-otel-demo.localhost`
 
 ### 3. Use Port-Forward as Alternative
 
@@ -93,7 +92,7 @@ The collector should be receiving traces on port 4317 (gRPC) or 4318 (HTTP).
 Make sure services are propagating trace context. Create an order to test:
 
 ```bash
-curl -X POST http://python-otel-example.localhost/api/orders \
+curl -X POST http://orders.127.0.0.1.nip.io/api/orders \
   -H 'Content-Type: application/json' \
   -d '{"product_id": 1, "quantity": 1, "user_id": "test-user"}'
 ```
@@ -166,5 +165,4 @@ Ensure Docker has enough resources (recommended: 4GB+ RAM, 2+ CPUs).
 
 ```bash
 kind delete cluster --name grafana-otel-demo
-sudo sed -i '/grafana-otel-demo.localhost/d' /etc/hosts
 ```

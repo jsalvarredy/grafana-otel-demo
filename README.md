@@ -34,16 +34,13 @@ cd grafana-otel-demo
 ./setup.sh
 ```
 
-Add to `/etc/hosts`:
-```
-127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost
-```
+No `/etc/hosts` changes needed - all domains use [nip.io](https://nip.io) for automatic DNS resolution.
 
-Access Grafana: http://grafana-otel-demo.localhost
+Access Grafana: http://grafana.127.0.0.1.nip.io
 - User: `admin`
 - Password: `Mikroways123`
 
-The demo includes two instrumented microservices (Node.js and Python) that generate realistic e-commerce telemetry.
+The demo includes three instrumented microservices (Node.js, Python, and Java) that generate realistic e-commerce telemetry. The Java service is auto-instrumented using Beyla eBPF, requiring zero code changes.
 
 ## Cost Comparison
 
@@ -91,8 +88,22 @@ For production deployment guidance, see [docs/PRODUCTION.md](docs/PRODUCTION.md)
 ### Demo Applications
 - **Products Service** (Node.js) - Catalog, search, inventory
 - **Orders Service** (Python) - Order processing, user sessions
+- **Shipping Service** (Java) - Shipment quotes, tracking, order fulfillment
 
-### Pre-built Dashboards
+### Instrumentation Approaches
+
+This demo showcases two instrumentation strategies side by side:
+
+| Approach | Services | How it works |
+|----------|----------|--------------|
+| OTEL SDK (manual) | Products, Orders | Libraries added to the application code |
+| Beyla eBPF (auto) | Shipping | Sidecar captures telemetry via kernel-level eBPF hooks, zero code changes |
+
+See [docs/BEYLA.md](docs/BEYLA.md) for a deep dive on Beyla and when to use each approach.
+
+### Pre-built Dashboards (6 included)
+- Kubernetes Cluster Overview
+- Logs Search
 - Service Overview (RED metrics)
 - Distributed Tracing
 - Log Analysis
@@ -110,10 +121,13 @@ For production deployment guidance, see [docs/PRODUCTION.md](docs/PRODUCTION.md)
 
 | Document | Description |
 |----------|-------------|
-| [docs/API.md](docs/API.md) | REST API reference |
+| [docs/API.md](docs/API.md) | REST API reference for all 3 services |
+| [docs/BEYLA.md](docs/BEYLA.md) | Beyla eBPF auto-instrumentation guide |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 | [docs/PRODUCTION.md](docs/PRODUCTION.md) | Production deployment guide |
 | [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) | Detailed cost comparison |
+| [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | APM and metrics improvements log |
+| [docs/VERIFICATION_CHECKLIST.md](docs/VERIFICATION_CHECKLIST.md) | Metrics verification checklist |
 
 ## Requirements
 

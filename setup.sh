@@ -5,7 +5,7 @@
 # - Nginx Ingress Controller
 # - Grafana LGTP Stack (Loki, Grafana, Tempo, Prometheus)
 # - OpenTelemetry Collector
-# - Demo microservices (Products Service &Orders Service)
+# - Demo microservices (Products Service, Orders Service & Shipping Service)
 
 set -e  # Exit on any error
 
@@ -49,7 +49,7 @@ print_info() {
 clear
 print_header "Grafana LGTP + OpenTelemetry Demo Setup"
 echo ""
-print_info "Setup will take approximately 5-10 minutes depending on your internet connection."
+print_info "Setup will take approximately 8-12 minutes depending on your internet connection."
 echo ""
 
 # ============================================================================
@@ -150,8 +150,9 @@ kubectl apply -f kind/dashboards/service-overview-dashboard.yaml > /dev/null 2>&
 kubectl apply -f kind/dashboards/tracing-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/logs-analysis-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/executive-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/observability-overview-dashboard.yaml > /dev/null 2>&1
 
-print_success "6 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis, Executive)"
+print_success "7 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis, Executive, Observability Overview)"
 echo ""
 
 # ============================================================================
@@ -168,9 +169,14 @@ print_step "Building Orders Service (Python)..."
 docker build -t orders-service:latest src/otel-python-app > /dev/null 2>&1
 print_success "Orders Service image built"
 
+print_step "Building Shipping Service (Java + Beyla eBPF)..."
+docker build -t shipping-service:latest src/shipping-service > /dev/null 2>&1
+print_success "Shipping Service image built"
+
 print_step "Loading images into Kind cluster..."
 kind load docker-image products-service:latest --name grafana-otel-demo > /dev/null 2>&1
 kind load docker-image orders-service:latest --name grafana-otel-demo > /dev/null 2>&1
+kind load docker-image shipping-service:latest --name grafana-otel-demo > /dev/null 2>&1
 print_success "Images loaded into cluster"
 
 print_step "Creating demo namespace..."
@@ -194,6 +200,16 @@ helm upgrade --install otel-python-app charts/otel-python-app \
   -f charts/otel-python-app/values.yaml \
   --wait --timeout 3m > /dev/null 2>&1
 print_success "Orders Service deployed"
+
+print_step "Deploying Shipping Service (with Beyla eBPF sidecar)..."
+helm upgrade --install shipping-service charts/shipping-service \
+  --set image.repository=shipping-service \
+  --set image.tag=latest \
+  --namespace demo \
+  --create-namespace \
+  -f charts/shipping-service/values.yaml \
+  --wait --timeout 5m > /dev/null 2>&1
+print_success "Shipping Service deployed"
 
 echo ""
 print_success "All services deployed successfully"
@@ -233,6 +249,7 @@ verify_deployment "monitoring" "app.kubernetes.io/name=tempo" "Tempo"
 verify_deployment "monitoring" "app.kubernetes.io/name=opentelemetry-collector" "OpenTelemetry Collector"
 verify_deployment "demo" "app.kubernetes.io/name=otel-demo-app" "Products Service"
 verify_deployment "demo" "app.kubernetes.io/name=otel-python-app" "Orders Service"
+verify_deployment "demo" "app.kubernetes.io/name=shipping-service" "Shipping Service"
 
 echo ""
 
@@ -264,35 +281,59 @@ make_request() {
     fi
 }
 
-# Simulate realistic e-commerce traffic
-for i in {1..30}; do
+# Simulate realistic e-commerce traffic across ALL services
+for i in {1..40}; do
     # Users browsing products
-    make_request "otel-example.localhost" "/api/products"
-    make_request "otel-example.localhost" "/api/categories"
-    
+    make_request "products.127.0.0.1.nip.io" "/api/products"
+    make_request "products.127.0.0.1.nip.io" "/api/categories"
+
     # Viewing individual products
     product_id=$((RANDOM % 8 + 1))
-    make_request "otel-example.localhost" "/api/products/${product_id}"
-    
-    # Some users place orders (which calls Products Service from Orders Service)
+    make_request "products.127.0.0.1.nip.io" "/api/products/${product_id}"
+
+    # Place orders (cross-service call: orders -> products)
     if (( RANDOM % 3 == 0 )); then
         order_data="{\"product_id\": ${product_id}, \"quantity\": 1, \"user_id\": \"user-$((RANDOM % 20 + 1))\"}"
-        make_request "python-otel-example.localhost" "/api/orders" "POST" "$order_data"
+        make_request "orders.127.0.0.1.nip.io" "/api/orders" "POST" "$order_data"
     fi
-    
-    # Health checks
-    make_request "otel-example.localhost" "/health"
-    make_request "python-otel-example.localhost" "/health"
-    
-    # Occasional errors for interesting data
-    if (( i % 10 == 0 )); then
-        make_request "otel-example.localhost" "/error"
-        make_request "python-otel-example.localhost" "/error"
+
+    # Shipping service - request quotes and create shipments every iteration
+    cities=("New York" "Los Angeles" "Chicago" "Houston" "Miami" "Seattle" "Denver" "Boston")
+    origin=${cities[$((RANDOM % ${#cities[@]}))]}
+    dest=${cities[$((RANDOM % ${#cities[@]}))]}
+    weight=$((RANDOM % 50 + 1))
+
+    quote_data="{\"origin\": \"${origin}\", \"destination\": \"${dest}\", \"weight\": ${weight}}"
+    make_request "shipping.127.0.0.1.nip.io" "/api/shipping/quote" "POST" "$quote_data"
+
+    ship_data="{\"order_id\": \"ORD-$((RANDOM % 1000))\", \"origin\": \"${origin}\", \"destination\": \"${dest}\", \"weight\": ${weight}}"
+    make_request "shipping.127.0.0.1.nip.io" "/api/shipping/create" "POST" "$ship_data"
+
+    # Track shipments and check order shipments
+    tracking_id=$(printf "SHP-%05d" $((RANDOM % 500 + 1)))
+    make_request "shipping.127.0.0.1.nip.io" "/api/shipping/track/${tracking_id}"
+
+    order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
+    make_request "shipping.127.0.0.1.nip.io" "/api/shipping/order/${order_id}"
+
+    # Shipping service info endpoint
+    make_request "shipping.127.0.0.1.nip.io" "/api/"
+
+    # Occasional slow endpoint to generate interesting latency data
+    if (( i % 5 == 0 )); then
+        make_request "shipping.127.0.0.1.nip.io" "/api/slow"
     fi
-    
+
+    # Occasional errors for interesting data (all services)
+    if (( i % 8 == 0 )); then
+        make_request "products.127.0.0.1.nip.io" "/error"
+        make_request "orders.127.0.0.1.nip.io" "/error"
+        make_request "shipping.127.0.0.1.nip.io" "/api/error"
+    fi
+
     # Progress indicator
     echo -n "."
-    sleep 0.3
+    sleep 0.2
 done
 
 echo ""
@@ -306,21 +347,7 @@ echo ""
 print_header "Access Information"
 echo ""
 
-# Check if entries exist in /etc/hosts
-if grep -q "grafana-otel-demo.localhost" /etc/hosts 2>/dev/null && \
-   grep -q "otel-example.localhost" /etc/hosts 2>/dev/null && \
-   grep -q "python-otel-example.localhost" /etc/hosts 2>/dev/null; then
-    print_success "/etc/hosts configuration found"
-else
-    print_warning "DNS Configuration Required"
-    echo ""
-    echo -e "Add the following to your ${YELLOW}/etc/hosts${NC} file:"
-    echo -e "${GREEN}127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost${NC}"
-    echo ""
-    echo "Quick command (requires sudo):"
-    echo -e "${CYAN}echo '127.0.0.1 grafana-otel-demo.localhost otel-example.localhost python-otel-example.localhost' | sudo tee -a /etc/hosts${NC}"
-    echo ""
-fi
+print_success "DNS resolves automatically via nip.io - no /etc/hosts changes needed"
 
 # ============================================================================
 # SETUP COMPLETE
@@ -334,14 +361,15 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 
 echo -e "${CYAN}Grafana Dashboard:${NC}"
-echo -e "   URL:      ${BLUE}http://grafana-otel-demo.localhost${NC}"
+echo -e "   URL:      ${BLUE}http://grafana.127.0.0.1.nip.io${NC}"
 echo -e "   User:     ${YELLOW}admin${NC}"
 echo -e "   Password: ${YELLOW}Mikroways123${NC}"
 echo ""
 
 echo -e "${CYAN}Demo Services:${NC}"
-echo -e "   Products Service: ${BLUE}http://otel-example.localhost${NC}"
-echo -e "   Orders Service:   ${BLUE}http://python-otel-example.localhost${NC}"
+echo -e "   Products Service:  ${BLUE}http://products.127.0.0.1.nip.io${NC}"
+echo -e "   Orders Service:    ${BLUE}http://orders.127.0.0.1.nip.io${NC}"
+echo -e "   Shipping Service:  ${BLUE}http://shipping.127.0.0.1.nip.io${NC}"
 echo ""
 
 echo -e "${CYAN}Quick Start:${NC}"

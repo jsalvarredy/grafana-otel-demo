@@ -11,7 +11,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: python-otel-example.localhost
+    - host: orders.127.0.0.1.nip.io
       paths:
         - path: /
           pathType: ImplementationSpecific

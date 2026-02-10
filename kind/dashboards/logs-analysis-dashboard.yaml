@@ -12,10 +12,7 @@ data:
         "list": [
           {
             "builtIn": 1,
-            "datasource": {
-              "type": "grafana",
-              "uid": "-- Grafana --"
-            },
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
             "enable": true,
             "hide": true,
             "iconColor": "rgba(0, 211, 255, 1)",
@@ -24,65 +21,42 @@ data:
           }
         ]
       },
+      "description": "Unified log analysis powered by Loki. View traffic patterns, errors, and live log streams from all services.",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 0,
       "id": null,
-      "links": [],
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": true,
+          "tags": [],
+          "targetBlank": false,
+          "title": "Navigate",
+          "type": "dashboards"
+        }
+      ],
       "liveNow": false,
       "panels": [
         {
-          "content": "# 🪵 Unified Logs & Traffic Analysis\n\n### 🔎 Controls\nUse the **Search Logs** field above to filter specific TraceIDs, UserIDs, or Error Messages across all panels.",
-          "gridPos": {
-            "h": 3,
-            "w": 24,
-            "x": 0,
-            "y": 0
-          },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
           "id": 1,
           "options": {
-            "code": {
-              "language": "markdown",
-              "showLineNumbers": false,
-              "showMiniMap": false
-            },
-            "content": "<div class=\"markdown-html\"><h1>🪵 Unified Logs &amp; Traffic Analysis</h1>\n<h3>🔎 Controls</h3>\n<p>Use the <strong>Search Logs</strong> field above to filter specific TraceIDs, UserIDs, or Error Messages across all panels.</p>\n</div>",
-            "mode": "markdown"
+            "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
+            "content": "<div style=\"padding:6px 0\">\n  <div style=\"font-size:24px;font-weight:700;color:#fff\">Unified Logs & Traffic Analysis</div>\n  <div style=\"font-size:13px;color:#8e8e8e;margin-top:4px\">Powered by <strong style=\"color:#1F60C4\">Loki</strong> &mdash; Use the <strong>Search Logs</strong> field above to filter by TraceID, UserID, or error messages</div>\n</div>",
+            "mode": "html"
           },
-          "pluginVersion": "10.0.0",
-          "title": "Welcome",
+          "transparent": true,
           "type": "text"
         },
         {
-          "datasource": {
-            "type": "loki",
-            "uid": "${datasource}"
-          },
-          "description": "Barras APILADAS: Verde = Tráfico Normal, Rojo = Errores (500s/Exceptions)",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 3
-          },
-          "id": 2,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "description": "Stacked bars: Green = Normal Traffic, Red = Errors (500s/Exceptions)",
           "fieldConfig": {
             "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
+              "color": { "mode": "palette-classic" },
               "custom": {
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
@@ -92,123 +66,69 @@ data:
                 "drawStyle": "bars",
                 "fillOpacity": 80,
                 "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
+                "scaleDistribution": { "type": "linear" },
                 "showPoints": "auto",
                 "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "normal"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
+                "stacking": { "group": "A", "mode": "normal" },
+                "thresholdsStyle": { "mode": "off" }
               },
               "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
             },
             "overrides": [
               {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Errors (Exceptions/Failures)"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "#FF0000",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
+                "matcher": { "id": "byName", "options": "Errors (Exceptions/Failures)" },
+                "properties": [ { "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } } ]
               },
               {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Normal Traffic (Info/Debug)"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "green",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
+                "matcher": { "id": "byName", "options": "Normal Traffic (Info/Debug)" },
+                "properties": [ { "id": "color", "value": { "fixedColor": "#37872D", "mode": "fixed" } } ]
               }
             ]
           },
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 3 },
+          "id": 2,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
           "targets": [
             {
-              "datasource": {
-                "type": "loki",
-                "uid": "${datasource}"
-              },
+              "datasource": { "type": "loki", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service\"} |= \"${search}\" !~ \"(?i)error|exception|fail\" [$__interval]))",
+              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service|shipping-service\"} |= \"${search}\" !~ \"(?i)error|exception|fail\" [$__interval]))",
               "legendFormat": "Normal Traffic (Info/Debug)",
               "queryType": "range",
               "refId": "A"
             },
             {
-              "datasource": {
-                "type": "loki",
-                "uid": "${datasource}"
-              },
+              "datasource": { "type": "loki", "uid": "${datasource}" },
               "editorMode": "code",
-              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service\"} |= \"${search}\" |= \"(?i)error|exception|fail\" [$__interval]))",
+              "expr": "sum(count_over_time({service_name=~\"orders-service|products-service|shipping-service\"} |= \"${search}\" |~ \"(?i)error|exception|fail\" [$__interval]))",
               "legendFormat": "Errors (Exceptions/Failures)",
               "queryType": "range",
               "refId": "B"
             }
           ],
-          "title": "📊 Global Traffic Volume & Health",
+          "title": "Global Traffic Volume & Health",
           "type": "timeseries"
         },
         {
           "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 10
-          },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
           "id": 3,
           "panels": [],
-          "title": "📦 Service: orders-service",
+          "title": "orders-service",
           "type": "row"
         },
         {
-          "datasource": {
-            "type": "loki",
-            "uid": "${datasource}"
-          },
-          "description": "Live logs stream.",
-          "gridPos": {
-            "h": 12,
-            "w": 24,
-            "x": 0,
-            "y": 11
-          },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "description": "Live log stream from orders-service",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 11 },
           "id": 4,
           "options": {
             "dedupStrategy": "none",
@@ -220,47 +140,30 @@ data:
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
-          "pluginVersion": "10.0.0",
           "targets": [
             {
-              "datasource": {
-                "type": "loki",
-                "uid": "${datasource}"
-              },
+              "datasource": { "type": "loki", "uid": "${datasource}" },
               "editorMode": "code",
               "expr": "{service_name=\"orders-service\"} |= \"${search}\"",
               "queryType": "range",
               "refId": "A"
             }
           ],
-          "title": "📄 Live Logs: orders-service",
+          "title": "Live Logs: orders-service",
           "type": "logs"
         },
         {
           "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 23
-          },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
           "id": 5,
           "panels": [],
-          "title": "🛒 Service: products-service",
+          "title": "products-service",
           "type": "row"
         },
         {
-          "datasource": {
-            "type": "loki",
-            "uid": "${datasource}"
-          },
-          "description": "Live logs stream.",
-          "gridPos": {
-            "h": 12,
-            "w": 24,
-            "x": 0,
-            "y": 24
-          },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "description": "Live log stream from products-service",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
           "id": 6,
           "options": {
             "dedupStrategy": "none",
@@ -272,37 +175,61 @@ data:
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
-          "pluginVersion": "10.0.0",
           "targets": [
             {
-              "datasource": {
-                "type": "loki",
-                "uid": "${datasource}"
-              },
+              "datasource": { "type": "loki", "uid": "${datasource}" },
               "editorMode": "code",
               "expr": "{service_name=\"products-service\"} |= \"${search}\"",
               "queryType": "range",
               "refId": "A"
             }
           ],
-          "title": "📄 Live Logs: products-service",
+          "title": "Live Logs: products-service",
+          "type": "logs"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+          "id": 7,
+          "panels": [],
+          "title": "shipping-service (Beyla eBPF)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "description": "Live log stream from shipping-service (Java with Beyla auto-instrumentation)",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 33 },
+          "id": 8,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": true,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "${datasource}" },
+              "editorMode": "code",
+              "expr": "{service_name=\"shipping-service\"} |= \"${search}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Live Logs: shipping-service",
           "type": "logs"
         }
       ],
       "schemaVersion": 38,
       "style": "dark",
-      "tags": [
-        "loki",
-        "logs"
-      ],
+      "tags": ["loki", "logs", "opentelemetry"],
       "templating": {
         "list": [
           {
-            "current": {
-              "selected": false,
-              "text": "Loki",
-              "value": "Loki"
-            },
+            "current": { "selected": false, "text": "Loki", "value": "Loki" },
             "hide": 0,
             "includeAll": false,
             "label": "Datasource",
@@ -316,31 +243,18 @@ data:
             "type": "datasource"
           },
           {
-            "current": {
-              "selected": false,
-              "text": "",
-              "value": ""
-            },
+            "current": { "selected": false, "text": "", "value": "" },
             "hide": 0,
             "label": "Search Logs",
             "name": "search",
-            "options": [
-              {
-                "selected": true,
-                "text": "",
-                "value": ""
-              }
-            ],
+            "options": [ { "selected": true, "text": "", "value": "" } ],
             "query": "",
             "skipUrlSync": false,
             "type": "textbox"
           }
         ]
       },
-      "time": {
-        "from": "now-1h",
-        "to": "now"
-      },
+      "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},
       "timezone": "",
       "title": "Log Analysis",

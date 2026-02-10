@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shipping-service.fullname" . }}
+  labels:
+    {{- include "shipping-service.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "shipping-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "shipping-service.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Annotation to indicate Beyla auto-instrumentation
+        instrumentation.beyla.io/enabled: "true"
+    spec:
+      # Required for Beyla eBPF - share process namespace between containers
+      shareProcessNamespace: true
+      containers:
+        # Main application container - Java Spring Boot WITHOUT OTEL SDK
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          {{- if .Values.env }}
+          env:
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+        {{- if .Values.beyla.enabled }}
+        # Beyla sidecar - eBPF auto-instrumentation
+        - name: beyla
+          image: "{{ .Values.beyla.image.repository }}:{{ .Values.beyla.image.tag }}"
+          securityContext:
+            # Beyla requires elevated privileges for eBPF
+            privileged: true
+            runAsUser: 0
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_PTRACE
+                - SYS_RESOURCE
+                - NET_ADMIN
+          env:
+            # Target the application by open port
+            - name: BEYLA_OPEN_PORT
+              value: "{{ .Values.beyla.openPort }}"
+            # Service name for traces and metrics (both BEYLA and OTEL variables)
+            - name: BEYLA_SERVICE_NAME
+              value: "{{ .Values.beyla.serviceName }}"
+            - name: OTEL_SERVICE_NAME
+              value: "{{ .Values.beyla.serviceName }}"
+            # OTEL exporter configuration - send to OTEL Collector
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.beyla.otelEndpoint }}"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            # Exclude health check endpoints from traces and metrics (K8s probes noise)
+            - name: BEYLA_ROUTES_IGNORE_PATTERNS
+              value: "/api/health,/health"
+            # Disable Beyla's internal traces (only export application traces)
+            - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_FEATURES
+              value: "application"
+            # Log level
+            - name: BEYLA_LOG_LEVEL
+              value: "INFO"
+            # Disable internal prometheus metrics export
+            - name: BEYLA_PROMETHEUS_PORT
+              value: "0"
+            - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_PORT
+              value: "0"
+          ports:
+            - name: beyla-metrics
+              containerPort: 9090
+              protocol: TCP
+            - name: beyla-internal
+              containerPort: 9091
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+        {{- end }}

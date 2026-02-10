@@ -1,14 +1,14 @@
 tempo:
   repository: grafana/tempo
   tag: 2.8.0
-  memBallastSizeMbs: 64
+  memBallastSizeMbs: 128
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 1000m
-      memory: 512Mi
+      memory: 1Gi
 
 storage:
   trace:

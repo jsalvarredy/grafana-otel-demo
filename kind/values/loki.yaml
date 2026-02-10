@@ -12,14 +12,14 @@ loki:
       memory: 64Mi
   commonConfig:
     replication_factor: 1
-# Configuración crítica para que funcione con OTel Collector
+# Required for OTel Collector compatibility
   limits_config:
     allow_structured_metadata: true
     max_label_name_length: 1024
     max_label_value_length: 2048
-    # Rechazar logs muy viejos para no sobrecargar ingester
+    # Reject old logs to avoid overloading the ingester
     reject_old_samples: true
-    reject_old_samples_max_age: 168h    
+    reject_old_samples_max_age: 168h
   schemaConfig:
     configs:
       - from: 2024-04-01
@@ -41,17 +41,17 @@ loki:
 
 chunksCache:
   enabled: true
-  # IMPORTANTE: Esto le dice a Memcached que use solo 256MB internamente
-  # Si no pones esto, por defecto intenta usar mucha más RAM y crashea.
+  # Tells Memcached to use only 128MB internally.
+  # Without this, it tries to use much more RAM and crashes.
   allocatedMemory: 128
   resources:
     limits:
-      memory: 256Mi  # Límite duro del contenedor (debe ser mayor al allocatedMemory)
+      memory: 256Mi  # Hard container limit (must exceed allocatedMemory)
     requests:
       cpu: 50m
       memory: 128Mi
 
-# Configuración del único Pod que hará todo
+# Single Pod that handles all Loki functions
 singleBinary:
   replicas: 1
   resources:
@@ -62,7 +62,7 @@ singleBinary:
     enabled: true
     size: 1Gi
 
-# El Gateway es el servicio frontal (Nginx)
+# Gateway is the front-facing service (Nginx)
 gateway:
   enabled: true
   service:
@@ -72,7 +72,7 @@ gateway:
       cpu: 10m
       memory: 64Mi
 
-# Desactivamos componentes distribuidos que no se usan en SingleBinary
+# Disable distributed components not used in SingleBinary mode
 backend:
   replicas: 0
 read:
