@@ -1,0 +1,44 @@
+# Shipping Service - Java application WITHOUT OpenTelemetry SDK
+# Beyla eBPF will auto-instrument this service
+
+image:
+  repository: shipping-service
+  pullPolicy: Never # Force using local image loaded into Kind
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: shipping.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Beyla eBPF sidecar configuration
+beyla:
+  enabled: true
+  image:
+    repository: grafana/beyla
+    tag: "1.8.4"  # Latest stable version
+  # Target the Java application by port
+  openPort: 8080
+  # Service name for telemetry
+  serviceName: "shipping-service"
+  # OTEL Collector endpoint
+  otelEndpoint: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+
+# No OTEL environment variables needed - Beyla handles everything!
+env: {}

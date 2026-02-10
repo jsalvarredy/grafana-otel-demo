@@ -1,0 +1,6 @@
+apiVersion: v2
+name: shipping-service
+description: A Helm chart for the Shipping Service (Java) - Auto-instrumented by Beyla eBPF
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

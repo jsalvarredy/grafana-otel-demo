@@ -11,7 +11,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: otel-example.localhost
+    - host: products.127.0.0.1.nip.io
       paths:
         - path: /
           pathType: ImplementationSpecific

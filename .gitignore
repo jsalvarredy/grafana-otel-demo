@@ -26,3 +26,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Claude Code
+.claude/
+
+# Python
+__pycache__/

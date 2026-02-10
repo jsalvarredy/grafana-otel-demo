@@ -6,7 +6,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   hosts:
-    - grafana-otel-demo.localhost
+    - grafana.127.0.0.1.nip.io
   path: /
 
 datasources:
@@ -24,7 +24,7 @@ datasources:
           # This enables the jump from Metrics to Traces (Exemplars)
           exemplarTraceIdDestinations:
             - name: trace_id
-              datasourceUid: Tempo # Debe coincidir con el UID de Tempo abajo
+              datasourceUid: Tempo # Must match the Tempo UID below
 
       - name: Loki
         type: loki
