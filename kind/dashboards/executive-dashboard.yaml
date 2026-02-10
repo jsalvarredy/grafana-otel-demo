@@ -24,7 +24,7 @@ data:
           }
         ]
       },
-      "description": "High-level business and reliability view for executive stakeholders. Powered by OpenTelemetry.",
+      "description": "High-level business and reliability view for executive stakeholders. Powered by OpenTelemetry (SDK + Beyla eBPF).",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
@@ -50,7 +50,7 @@ data:
           "id": 50,
           "options": {
             "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
-            "content": "<div style=\"display:flex;align-items:center;gap:16px;padding:4px 0\">\n  <span style=\"font-size:28px;font-weight:700;color:#fff\">Platform Reliability Report</span>\n  <span style=\"font-size:14px;color:#8e8e8e;margin-left:auto\">OpenTelemetry PoC &mdash; Metrics | Logs | Traces</span>\n</div>",
+            "content": "<div style=\"display:flex;align-items:center;gap:16px;padding:4px 0\">\n  <span style=\"font-size:28px;font-weight:700;color:#fff\">Platform Reliability Report</span>\n  <span style=\"font-size:14px;color:#8e8e8e;margin-left:auto\">OpenTelemetry PoC &mdash; SDK + Beyla eBPF &mdash; Metrics | Logs | Traces</span>\n</div>",
             "mode": "html"
           },
           "transparent": true,
@@ -66,7 +66,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Total HTTP requests per second across all services",
+          "description": "Total HTTP requests per second across all services (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "fixedColor": "#37872D", "mode": "fixed" },
@@ -95,7 +95,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(rate(http_requests_total[5m]))",
+              "expr": "sum(rate(http_requests_total[5m])) + sum(rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "Total Throughput",
               "refId": "A"
             }
@@ -105,7 +105,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Platform-wide availability based on successful HTTP responses",
+          "description": "Platform-wide availability based on successful HTTP responses (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -140,7 +140,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(1 - (sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) / sum(rate(http_requests_total[30m])))) * 100",
+              "expr": "(1 - ((sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[30m]))) / (sum(rate(http_requests_total[30m])) + sum(rate(http_server_request_duration_seconds_count[30m]))))) * 100",
               "legendFormat": "Availability",
               "refId": "A"
             }
@@ -150,7 +150,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Overall error rate for 5xx responses across all services",
+          "description": "Overall error rate for 5xx responses across all services (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -183,7 +183,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))) * 100",
+              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]))) / (sum(rate(http_requests_total[5m])) + sum(rate(http_server_request_duration_seconds_count[5m])))) * 100",
               "legendFormat": "Error Rate",
               "refId": "A"
             }
@@ -193,7 +193,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "95th percentile response latency across all services",
+          "description": "95th percentile response latency across all services (SDK in ms + Beyla converted to ms)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -219,16 +219,22 @@ data:
             "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": { "values": false, "calcs": ["max"], "fields": "" },
             "text": {},
             "textMode": "value_and_name"
           },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le)) * 1000",
-              "legendFormat": "P95 Latency",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P95 SDK",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "P95 Beyla",
+              "refId": "B"
             }
           ],
           "title": "P95 Latency",
@@ -236,7 +242,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Number of services reporting telemetry via OpenTelemetry",
+          "description": "Number of services reporting telemetry via OpenTelemetry (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "fixedColor": "#8F3BB8", "mode": "fixed" },
@@ -265,7 +271,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "count(count by (service_name) (http_requests_total))",
+              "expr": "count(count by (service_name) (http_requests_total) or count by (service_name) (http_server_request_duration_seconds_count))",
               "legendFormat": "Active Services",
               "refId": "A"
             }
@@ -275,7 +281,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Total HTTP requests processed in the selected time window",
+          "description": "Total HTTP requests processed in the selected time window (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "fixedColor": "#1F60C4", "mode": "fixed" },
@@ -304,7 +310,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(increase(http_requests_total[1h]))",
+              "expr": "sum(increase(http_requests_total[1h])) + sum(increase(http_server_request_duration_seconds_count[1h]))",
               "legendFormat": "Requests (1h)",
               "refId": "A"
             }
@@ -322,7 +328,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Platform availability over last 30 minutes (Target: 99.9%)",
+          "description": "Platform availability over last 30 minutes (Target: 99.9%) - includes SDK + Beyla services",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -355,7 +361,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(1 - (sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) / sum(rate(http_requests_total[30m])))) * 100",
+              "expr": "(1 - ((sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[30m]))) / (sum(rate(http_requests_total[30m])) + sum(rate(http_server_request_duration_seconds_count[30m]))))) * 100",
               "refId": "A"
             }
           ],
@@ -364,7 +370,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "95th percentile latency SLO (Target: <500ms)",
+          "description": "95th percentile latency SLO (Target: <500ms) - worst of SDK and Beyla",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -374,29 +380,29 @@ data:
                   "options": {
                     "from": 0,
                     "result": { "color": "green", "index": 0, "text": "Within SLO" },
-                    "to": 0.5
+                    "to": 500
                   },
                   "type": "range"
                 },
                 {
                   "options": {
-                    "from": 0.5,
+                    "from": 500,
                     "result": { "color": "red", "index": 1, "text": "SLO Violated" },
-                    "to": 100
+                    "to": 100000
                   },
                   "type": "range"
                 }
               ],
-              "max": 1,
+              "max": 1000,
               "min": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   { "color": "green", "value": null },
-                  { "color": "red", "value": 0.5 }
+                  { "color": "red", "value": 500 }
                 ]
               },
-              "unit": "s"
+              "unit": "ms"
             },
             "overrides": []
           },
@@ -404,7 +410,7 @@ data:
           "id": 202,
           "options": {
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": { "values": false, "calcs": ["max"], "fields": "" },
             "showThresholdLabels": true,
             "showThresholdMarkers": true,
             "text": { "valueSize": 32 }
@@ -412,8 +418,15 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P95 SDK (ms)",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "P95 Beyla (ms)",
+              "refId": "B"
             }
           ],
           "title": "Latency SLO P95 (Target: <500ms)",
@@ -421,7 +434,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Remaining error budget for the current hour. Based on 0.1% error rate target.",
+          "description": "Remaining error budget for the current hour. Based on 0.1% error rate target. Includes SDK + Beyla services.",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -454,7 +467,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "clamp_min(100 - ((sum(rate(http_requests_total{http_status_code=~\"5..\"}[1h])) / sum(rate(http_requests_total[1h]))) / 0.001) * 100, 0)",
+              "expr": "clamp_min(100 - (((sum(rate(http_requests_total{http_status_code=~\"5..\"}[1h])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1h]))) / (sum(rate(http_requests_total[1h])) + sum(rate(http_server_request_duration_seconds_count[1h])))) / 0.001) * 100, 0)",
               "refId": "A"
             }
           ],
@@ -471,7 +484,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Health score per service based on success rate",
+          "description": "Health score per service based on success rate (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -529,7 +542,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(1 - (sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m])))) * 100",
+              "expr": "(1 - (sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m])))) * 100 or (1 - (sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])))) * 100",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -549,7 +562,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Error rate trend per service over time",
+          "description": "Error rate trend per service over time (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -593,7 +606,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "(sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))) or (sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             }
@@ -603,7 +616,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Traffic distribution across services",
+          "description": "Traffic distribution across services (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -624,7 +637,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "sum by (service_name) (rate(http_requests_total[5m])) or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             }
@@ -642,7 +655,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Request throughput per service over time",
+          "description": "Request throughput per service over time (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -683,7 +696,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "sum by (service_name) (rate(http_requests_total[5m])) or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             }
@@ -693,7 +706,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "P50, P95, P99 response latency trends",
+          "description": "P50, P95, P99 response latency trends (SDK in ms, Beyla converted to ms)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -745,21 +758,39 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.50, sum(rate(http_server_duration_bucket[5m])) by (le)) * 1000",
-              "legendFormat": "P50 (median)",
+              "expr": "histogram_quantile(0.50, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P50 SDK (median)",
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le)) * 1000",
-              "legendFormat": "P95",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P95 SDK",
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_bucket[5m])) by (le)) * 1000",
-              "legendFormat": "P99",
+              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P99 SDK",
               "refId": "C"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "P50 Beyla (median)",
+              "refId": "D"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "P95 Beyla",
+              "refId": "E"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "P99 Beyla",
+              "refId": "F"
             }
           ],
           "title": "Response Latency Percentiles",
@@ -775,7 +806,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Distribution of HTTP response codes across all services",
+          "description": "Distribution of HTTP response codes across all services (SDK + Beyla with unified labels)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -829,7 +860,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (http_status_code) (rate(http_requests_total[5m]))",
+              "expr": "sum by (http_status_code) (rate(http_requests_total[5m])) or sum by (http_status_code) (label_replace(rate(http_server_request_duration_seconds_count[5m]), \"http_status_code\", \"$1\", \"http_response_status_code\", \"(.+)\"))",
               "legendFormat": "{{http_status_code}}",
               "refId": "A"
             }
@@ -839,7 +870,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Per-service request rate and health details",
+          "description": "Per-service request rate and health details (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -871,12 +902,19 @@ data:
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "P95 Latency" },
+                "matcher": { "id": "byName", "options": "P95 Latency (ms)" },
                 "properties": [
                   { "id": "unit", "value": "ms" },
                   { "id": "decimals", "value": 0 },
                   { "id": "custom.cellOptions", "value": { "type": "color-background" } },
                   { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 200 }, { "color": "red", "value": 500 } ] } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Instrumentation" },
+                "properties": [
+                  { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+                  { "id": "mappings", "value": [ { "options": { "SDK": { "color": "#37872D", "index": 0, "text": "SDK" }, "eBPF": { "color": "#8F3BB8", "index": 1, "text": "eBPF (Beyla)" } }, "type": "value" } ] }
                 ]
               }
             ]
@@ -891,21 +929,21 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "sum by (service_name) (rate(http_requests_total[5m])) or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "format": "table",
               "instant": true,
               "refId": "A"
             },
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "(sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))) or (sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])))",
               "format": "table",
               "instant": true,
               "refId": "B"
             },
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le, service_name)) * 1000",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name)) or histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) * 1000",
               "format": "table",
               "instant": true,
               "refId": "C"
@@ -919,17 +957,173 @@ data:
               "options": {
                 "excludeByName": { "Time": true, "le": true },
                 "indexByName": { "service_name": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3 },
-                "renameByName": { "Value #A": "Req/s", "Value #B": "Error Rate", "Value #C": "P95 Latency", "service_name": "Service" }
+                "renameByName": { "Value #A": "Req/s", "Value #B": "Error Rate", "Value #C": "P95 Latency (ms)", "service_name": "Service" }
               }
             }
           ],
           "type": "table"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+          "id": 600,
+          "panels": [],
+          "title": "Instrumentation Comparison",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Number of services instrumented via OpenTelemetry SDK (manual instrumentation)",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "#37872D", "mode": "fixed" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "#37872D", "value": null }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 41 },
+          "id": 601,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "text": { "valueSize": 48 },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "count(count by (service_name) (http_requests_total))",
+              "legendFormat": "SDK Services",
+              "refId": "A"
+            }
+          ],
+          "title": "SDK Instrumented Services",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Number of services auto-instrumented via Beyla eBPF",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "#8F3BB8", "mode": "fixed" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "#8F3BB8", "value": null }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 41 },
+          "id": 602,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "text": { "valueSize": 48 },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "count(count by (service_name) (http_server_request_duration_seconds_count{otel_scope_name=~\".*beyla.*\"}))",
+              "legendFormat": "eBPF Services",
+              "refId": "A"
+            }
+          ],
+          "title": "eBPF Auto-Instrumented Services",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Side-by-side comparison of request rates from SDK-instrumented vs Beyla eBPF auto-instrumented services",
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 25,
+                "gradientMode": "opacity",
+                "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [ { "color": "green", "value": null } ]
+              },
+              "unit": "reqps"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": "^SDK.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#37872D", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": "^Beyla.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#8F3BB8", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 41 },
+          "id": 603,
+          "options": {
+            "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "legendFormat": "SDK - {{service_name}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
+              "legendFormat": "Beyla - {{service_name}}",
+              "refId": "B"
+            }
+          ],
+          "title": "Request Rate: SDK vs Beyla eBPF",
+          "type": "timeseries"
         }
       ],
       "refresh": "10s",
       "schemaVersion": 38,
       "style": "dark",
-      "tags": ["executive", "business", "c-level", "kpi", "opentelemetry"],
+      "tags": ["executive", "business", "c-level", "kpi", "opentelemetry", "beyla", "ebpf"],
       "templating": { "list": [] },
       "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},

@@ -21,7 +21,7 @@ data:
           }
         ]
       },
-      "description": "Landing page for the OpenTelemetry Observability PoC. Shows the three pillars of observability and platform health.",
+      "description": "Landing page for the OpenTelemetry Observability PoC. Unified view combining SDK instrumentation (Node.js, Python) and eBPF auto-instrumentation (Beyla/Java).",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
@@ -45,7 +45,7 @@ data:
           "id": 1,
           "options": {
             "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
-            "content": "<div style=\"text-align:center;padding:8px 0\">\n  <div style=\"font-size:32px;font-weight:700;color:#fff;letter-spacing:1px\">OpenTelemetry Observability Platform</div>\n  <div style=\"font-size:16px;color:#8e8e8e;margin-top:4px\">Proof of Concept &mdash; Unified Metrics, Logs &amp; Traces</div>\n  <div style=\"margin-top:10px;display:flex;justify-content:center;gap:32px;font-size:13px\">\n    <span style=\"color:#37872D\">&#9679; Prometheus (Metrics)</span>\n    <span style=\"color:#1F60C4\">&#9679; Loki (Logs)</span>\n    <span style=\"color:#8F3BB8\">&#9679; Tempo (Traces)</span>\n    <span style=\"color:#FF9830\">&#9679; OpenTelemetry Collector</span>\n  </div>\n</div>",
+            "content": "<div style=\"text-align:center;padding:8px 0\">\n  <div style=\"font-size:32px;font-weight:700;color:#fff;letter-spacing:1px\">OpenTelemetry Observability Platform</div>\n  <div style=\"font-size:16px;color:#8e8e8e;margin-top:4px\">Proof of Concept &mdash; Unified Metrics, Logs &amp; Traces</div>\n  <div style=\"margin-top:10px;display:flex;justify-content:center;gap:32px;font-size:13px\">\n    <span style=\"color:#37872D\">&#9679; Prometheus (Metrics)</span>\n    <span style=\"color:#1F60C4\">&#9679; Loki (Logs)</span>\n    <span style=\"color:#8F3BB8\">&#9679; Tempo (Traces)</span>\n    <span style=\"color:#FF9830\">&#9679; OpenTelemetry Collector</span>\n    <span style=\"color:#E0B400\">&#9679; Beyla eBPF</span>\n  </div>\n</div>",
             "mode": "html"
           },
           "transparent": true,
@@ -83,7 +83,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(rate(http_requests_total[5m]))",
+              "expr": "sum(rate(http_requests_total[5m])) + sum(rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "Total RPS",
               "refId": "A"
             }
@@ -116,7 +116,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(1 - (sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) / sum(rate(http_requests_total[30m])))) * 100",
+              "expr": "(1 - ((sum(rate(http_requests_total{http_status_code=~\"5..\"}[30m])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[30m]))) / (sum(rate(http_requests_total[30m])) + sum(rate(http_server_request_duration_seconds_count[30m]))))) * 100",
               "legendFormat": "Availability",
               "refId": "A"
             }
@@ -143,15 +143,21 @@ data:
             "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": { "values": false, "calcs": ["max"], "fields": "" },
             "textMode": "value_and_name"
           },
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le)) * 1000",
-              "legendFormat": "P95 Latency",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "SDK P95",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "Beyla P95",
+              "refId": "B"
             }
           ],
           "title": "P95 Latency",
@@ -182,7 +188,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "(sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))) * 100",
+              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) + sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]))) / (sum(rate(http_requests_total[5m])) + sum(rate(http_server_request_duration_seconds_count[5m])))) * 100",
               "legendFormat": "Error Rate",
               "refId": "A"
             }
@@ -214,7 +220,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "count(count by (service_name) (http_requests_total))",
+              "expr": "count(count by (service_name) (http_requests_total) or count by (service_name) (http_server_request_duration_seconds_count))",
               "legendFormat": "Services",
               "refId": "A"
             }
@@ -237,7 +243,7 @@ data:
           "id": 16,
           "options": {
             "colorMode": "background",
-            "graphMode": "area",
+            "graphMode": "none",
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
@@ -246,7 +252,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "count(count by (http_target) (http_requests_total))",
+              "expr": "count(count by (endpoint) (http_requests_total) or count by (http_route) (http_server_request_duration_seconds_count))",
               "legendFormat": "Endpoints",
               "refId": "A"
             }
@@ -296,7 +302,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Stacked request rate showing traffic volume per service",
+          "description": "Stacked request rate showing traffic volume per service (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -334,7 +340,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "sum by (service_name) (rate(http_requests_total[5m])) or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             }
@@ -344,7 +350,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Error rate trend per service showing 5xx responses",
+          "description": "Error rate trend per service showing 5xx responses (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -385,6 +391,12 @@ data:
               "expr": "sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
+              "legendFormat": "{{service_name}}",
+              "refId": "B"
             }
           ],
           "title": "Error Rate by Service",
@@ -400,7 +412,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "P95 latency trend per service",
+          "description": "P95 latency trend per service (SDK in ms, Beyla converted from seconds to ms)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -438,9 +450,15 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le, service_name)) * 1000",
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) * 1000",
+              "legendFormat": "{{service_name}}",
+              "refId": "B"
             }
           ],
           "title": "P95 Latency by Service",
@@ -483,7 +501,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "Traffic distribution across services",
+          "description": "Traffic distribution across all services (SDK + Beyla)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -504,7 +522,7 @@ data:
           "targets": [
             {
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "expr": "sum by (service_name) (rate(http_requests_total[5m])) or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             }
@@ -514,7 +532,7 @@ data:
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "description": "HTTP response status code breakdown",
+          "description": "HTTP response status code breakdown (SDK + Beyla unified)",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -551,6 +569,12 @@ data:
               "expr": "sum by (http_status_code) (rate(http_requests_total[5m]))",
               "legendFormat": "{{http_status_code}}",
               "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum by (http_response_status_code) (label_replace(rate(http_server_request_duration_seconds_count[5m]), \"http_status_code\", \"$1\", \"http_response_status_code\", \"(.*)\"))",
+              "legendFormat": "{{http_response_status_code}}",
+              "refId": "B"
             }
           ],
           "title": "Response Code Distribution",
@@ -566,12 +590,32 @@ data:
           },
           "title": "Technology Stack",
           "type": "text"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+          "id": 60,
+          "panels": [],
+          "title": "Instrumentation Methods",
+          "type": "row"
+        },
+        {
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 48 },
+          "id": 61,
+          "options": {
+            "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
+            "content": "<div style=\"padding:16px\">\n<div style=\"font-size:18px;font-weight:700;margin-bottom:16px;color:#fff;text-align:center\">SDK vs eBPF Instrumentation</div>\n<div style=\"display:flex;gap:24px;justify-content:center\">\n  <div style=\"flex:1;max-width:480px;background:rgba(55,135,45,0.1);border:1px solid #37872D;border-radius:12px;padding:20px\">\n    <div style=\"display:flex;align-items:center;gap:10px;margin-bottom:14px\">\n      <div style=\"width:40px;height:40px;border-radius:8px;background:#37872D;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700\">S</div>\n      <div>\n        <div style=\"font-size:16px;font-weight:700;color:#37872D\">SDK Instrumentation (Manual)</div>\n        <div style=\"font-size:11px;color:#999\">Code-level integration</div>\n      </div>\n    </div>\n    <div style=\"font-size:12px;color:#ccc;line-height:1.8\">\n      <div style=\"margin-bottom:8px\"><strong style=\"color:#fff\">Languages:</strong> <span style=\"background:rgba(115,191,105,0.2);padding:2px 8px;border-radius:4px;color:#73BF69\">Node.js</span> <span style=\"background:rgba(255,152,48,0.2);padding:2px 8px;border-radius:4px;color:#FF9830\">Python</span></div>\n      <div style=\"margin-bottom:8px\"><strong style=\"color:#fff\">Services:</strong> products-service, orders-service</div>\n      <div style=\"border-top:1px solid rgba(55,135,45,0.3);padding-top:10px;margin-top:6px\">\n        <div style=\"margin-bottom:4px\">&#10003; Full control over spans, metrics, and logs</div>\n        <div style=\"margin-bottom:4px\">&#10003; Custom attributes and business context</div>\n        <div style=\"margin-bottom:4px\">&#10003; Fine-grained metric definitions</div>\n        <div style=\"margin-bottom:4px\">&#10003; Propagated trace context across services</div>\n        <div style=\"margin-bottom:4px\">&#10003; Structured log correlation with TraceID</div>\n      </div>\n      <div style=\"border-top:1px solid rgba(55,135,45,0.3);padding-top:10px;margin-top:10px\">\n        <div style=\"font-size:11px;color:#999\"><strong>Metrics:</strong> http_requests_total, http_server_duration_milliseconds_bucket</div>\n        <div style=\"font-size:11px;color:#999\"><strong>Labels:</strong> service_name, endpoint, http_status_code, method</div>\n      </div>\n    </div>\n  </div>\n  <div style=\"flex:1;max-width:480px;background:rgba(143,59,184,0.1);border:1px solid #8F3BB8;border-radius:12px;padding:20px\">\n    <div style=\"display:flex;align-items:center;gap:10px;margin-bottom:14px\">\n      <div style=\"width:40px;height:40px;border-radius:8px;background:#8F3BB8;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;font-weight:700\">B</div>\n      <div>\n        <div style=\"font-size:16px;font-weight:700;color:#8F3BB8\">eBPF Instrumentation (Beyla Auto)</div>\n        <div style=\"font-size:11px;color:#999\">Kernel-level auto-capture</div>\n      </div>\n    </div>\n    <div style=\"font-size:12px;color:#ccc;line-height:1.8\">\n      <div style=\"margin-bottom:8px\"><strong style=\"color:#fff\">Languages:</strong> <span style=\"background:rgba(143,59,184,0.2);padding:2px 8px;border-radius:4px;color:#B877D9\">Java</span></div>\n      <div style=\"margin-bottom:8px\"><strong style=\"color:#fff\">Services:</strong> shipping-service</div>\n      <div style=\"border-top:1px solid rgba(143,59,184,0.3);padding-top:10px;margin-top:6px\">\n        <div style=\"margin-bottom:4px\">&#10003; Zero code changes required</div>\n        <div style=\"margin-bottom:4px\">&#10003; Automatic HTTP/gRPC request capture</div>\n        <div style=\"margin-bottom:4px\">&#10003; Kernel-level visibility via eBPF</div>\n        <div style=\"margin-bottom:4px\">&#10003; Low overhead, no runtime dependency</div>\n        <div style=\"margin-bottom:4px\">&#10003; Language and framework agnostic</div>\n      </div>\n      <div style=\"border-top:1px solid rgba(143,59,184,0.3);padding-top:10px;margin-top:10px\">\n        <div style=\"font-size:11px;color:#999\"><strong>Metrics:</strong> http_server_request_duration_seconds_bucket/count</div>\n        <div style=\"font-size:11px;color:#999\"><strong>Labels:</strong> service_name, http_route, http_response_status_code, http_request_method</div>\n      </div>\n    </div>\n  </div>\n</div>\n</div>",
+            "mode": "html"
+          },
+          "transparent": false,
+          "title": "SDK vs eBPF Comparison",
+          "type": "text"
         }
       ],
       "refresh": "10s",
       "schemaVersion": 38,
       "style": "dark",
-      "tags": ["overview", "opentelemetry", "observability", "landing"],
+      "tags": ["overview", "opentelemetry", "observability", "landing", "beyla", "ebpf"],
       "templating": { "list": [] },
       "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},
