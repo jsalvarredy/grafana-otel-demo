@@ -1,14 +1,14 @@
 server:
   service:
     type: ClusterIP
-    
-  # Simple generic config provided by default is usually enough for scraping annotated pods,
-  # but we can customize if needed. For now, default is fine.
-  
+
   resources:
     requests:
       cpu: 100m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 alertmanager:
   enabled: false
@@ -18,6 +18,6 @@ pushgateway:
 
 nodeExporter:
   enabled: true # Useful for node metrics
-  
+
 kubeStateMetrics:
   enabled: true # Useful for K8s metrics

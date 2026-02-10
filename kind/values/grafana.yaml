@@ -15,7 +15,7 @@ datasources:
     datasources:
       - name: Prometheus
         type: prometheus
-        uid: Prometheus        
+        uid: Prometheus
         # Service URL for prometheus server (from prometheus-community chart)
         url: http://prometheus-server.monitoring.svc.cluster.local
         access: proxy
@@ -53,8 +53,17 @@ datasources:
             filterBySpanID: true
             spanStartTimeShift: '-5m'
             spanEndTimeShift: '5m'
+          tracesToMetrics:
+            datasourceUid: Prometheus
+            spanStartTimeShift: '-5m'
+            spanEndTimeShift: '5m'
+            tags:
+              - key: service.name
+                value: service_name
           lokiSearch:
             datasourceUid: Loki
+          serviceMap:
+            datasourceUid: Prometheus
 
 sidecar:
   dashboards:
@@ -63,5 +72,3 @@ sidecar:
     folder: /tmp/dashboards
     provider:
       allowUiUpdates: true
-
-
