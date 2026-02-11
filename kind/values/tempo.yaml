@@ -4,11 +4,46 @@ tempo:
   memBallastSizeMbs: 128
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 250m
+      memory: 512Mi
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 2Gi
+
+  # Limit concurrent queries to prevent Tempo from being overwhelmed
+  # by dashboard auto-refresh firing many TraceQL searches at once
+  querier:
+    max_concurrent_queries: 10
+
+  queryFrontend:
+    search:
+      max_duration: 1h
+      default_result_limit: 20
+      max_result_limit: 50
+
+  server:
+    http_listen_port: 3200
+    http_server_read_timeout: 60s
+    http_server_write_timeout: 60s
+
+  # More tolerant probes: Tempo can become temporarily unresponsive
+  # during heavy search queries without being actually unhealthy
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: 3200
+    initialDelaySeconds: 30
+    timeoutSeconds: 10
+    periodSeconds: 15
+    failureThreshold: 5
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 3200
+    initialDelaySeconds: 20
+    timeoutSeconds: 10
+    periodSeconds: 10
+    failureThreshold: 5
 
 storage:
   trace:
