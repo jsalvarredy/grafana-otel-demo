@@ -1,5 +1,14 @@
-# Shipping Service - Java application WITHOUT OpenTelemetry SDK
-# Beyla eBPF will auto-instrument this service
+# Shipping Service - Java / Spring Boot, auto-instrumented WITHOUT touching code.
+#
+# Two interchangeable auto-instrumentation strategies are supported:
+#   * instrumentation.javaAgent (DEFAULT) - OpenTelemetry Java agent, baked into
+#     the image and enabled via JAVA_TOOL_OPTIONS. Works on ANY kernel and emits
+#     metrics, traces and logs over OTLP. This is what makes the demo reliable.
+#   * beyla (OPT-IN) - eBPF auto-instrumentation via a sidecar. Requires a
+#     BTF-enabled kernel (CONFIG_DEBUG_INFO_BTF=y). Showcases zero-code eBPF
+#     instrumentation when the kernel supports it.
+#
+# Keep exactly ONE of the two enabled to avoid double-counting HTTP metrics.
 
 image:
   repository: shipping-service
@@ -27,18 +36,32 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-# Beyla eBPF sidecar configuration
+# OTLP target + service identity shared by both instrumentation methods.
+otel:
+  serviceName: "shipping-service"
+  endpoint: "http://alloy.monitoring.svc.cluster.local:4318"
+
+# DEFAULT instrumentation: OpenTelemetry Java agent (bytecode, any kernel).
+# The agent jar is baked into the image by the Dockerfile at agentPath.
+instrumentation:
+  javaAgent:
+    enabled: true
+    agentPath: "/otel/opentelemetry-javaagent.jar"
+
+# OPT-IN instrumentation: Beyla eBPF sidecar. Requires a BTF-enabled kernel.
+# If you enable this, set instrumentation.javaAgent.enabled=false to avoid
+# emitting duplicate HTTP metrics from both the agent and Beyla.
 beyla:
-  enabled: true
+  enabled: false
   image:
     repository: grafana/beyla
-    tag: "1.8.4"  # Latest stable version
+    tag: "1.8.4"
   # Target the Java application by port
   openPort: 8080
   # Service name for telemetry
   serviceName: "shipping-service"
   # OTEL Collector endpoint
-  otelEndpoint: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+  otelEndpoint: "http://alloy.monitoring.svc.cluster.local:4318"
 
-# No OTEL environment variables needed - Beyla handles everything!
+# Extra environment variables for the app container (merged with the agent vars).
 env: {}

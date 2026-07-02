@@ -14,7 +14,7 @@ releases:
   - name: ingress-nginx
     namespace: ingress-nginx
     chart: ingress-nginx/ingress-nginx
-    version: 4.14.*
+    version: 4.15.1
     wait: true
     values:
       - controller:
@@ -30,7 +30,7 @@ releases:
   - name: prometheus
     namespace: monitoring
     chart: prometheus-community/prometheus
-    version: 25.11.0
+    version: 29.13.0
     values:
       - ../values/prometheus.yaml
 
@@ -38,7 +38,7 @@ releases:
   - name: loki
     namespace: monitoring
     chart: grafana/loki
-    version: 6.6.6
+    version: 7.0.0
     values:
       - ../values/loki.yaml
 
@@ -46,6 +46,7 @@ releases:
   - name: tempo
     namespace: monitoring
     chart: grafana/tempo
+    version: 1.24.4
     values:
       - ../values/tempo.yaml
 
@@ -53,6 +54,7 @@ releases:
   - name: grafana
     namespace: monitoring
     chart: grafana/grafana
+    version: 10.5.15
     disableValidation: true   
     needs:
       - ingress-nginx/ingress-nginx    
@@ -61,13 +63,57 @@ releases:
     values:
       - ../values/grafana.yaml
 
-  # 6. OpenTelemetry Collector
-  - name: otel-collector
+  # 6b. Grafana Alloy - node log collector (DaemonSet)  [FASE 1]
+  # Replaces the former otel-logs-agent (OTel Collector). Tails every pod's
+  # logs and ships them to Loki, reproducing the same labels (service_name,
+  # service_namespace, k8s_*). This is what gives the Java shipping-service
+  # (no OTLP logs) its logs in Loki. Promtail/Grafana Agent are EOL; Alloy is
+  # the supported collector, so log collection converges on Alloy.
+  - name: alloy-logs
     namespace: monitoring
-    chart: open-telemetry/opentelemetry-collector
+    chart: grafana/alloy
+    version: 1.10.0
     needs:
-      - monitoring/prometheus
       - monitoring/loki
-      - monitoring/tempo    
     values:
-      - ../values/otel-collector.yaml
+      - ../values/alloy-logs.yaml
+
+  # 7. Pyroscope (Continuous Profiling)
+  # Continuous code profiling (CPU / heap flame graphs) - the open-source
+  # equivalent of Datadog Continuous Profiler / New Relic CodeStream profiling,
+  # which are paid add-ons there and free here.
+  - name: pyroscope
+    namespace: monitoring
+    chart: grafana/pyroscope
+    version: 2.1.0
+    values:
+      - ../values/pyroscope.yaml
+
+  # 8. Blackbox exporter (synthetic / uptime monitoring)
+  # Probes the demo services from outside and exposes up/down + latency, the
+  # open-source counterpart to Datadog/New Relic Synthetics. Prometheus scrapes
+  # it via the blackbox-http job in values/prometheus.yaml.
+  - name: blackbox-exporter
+    namespace: monitoring
+    chart: prometheus-community/prometheus-blackbox-exporter
+    version: 11.13.0
+    values:
+      - ../values/blackbox-exporter.yaml
+
+  # 9. Grafana Alloy - unified telemetry gateway (Deployment)  [FASE 2]
+  # Receives Real User Monitoring data from the browser (Grafana Faro Web SDK)
+  # AND the backend OTLP pipeline (products/orders/shipping), replacing the
+  # former otel-collector Deployment entirely. One process: faro.receiver +
+  # otelcol.receiver.otlp -> k8sattributes -> tail_sampling -> batch ->
+  # Tempo/Prometheus(remote_write, with exemplars)/Loki. See values/alloy.yaml
+  # for the full pipeline and the exemplars migration notes.
+  - name: alloy
+    namespace: monitoring
+    chart: grafana/alloy
+    version: 1.10.0
+    needs:
+      - monitoring/loki
+      - monitoring/tempo
+      - monitoring/prometheus
+    values:
+      - ../values/alloy.yaml

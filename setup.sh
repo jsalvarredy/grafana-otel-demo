@@ -4,7 +4,8 @@
 # This script creates a Kind cluster and deploys a complete observability stack:
 # - Nginx Ingress Controller
 # - Grafana LGTP Stack (Loki, Grafana, Tempo, Prometheus)
-# - OpenTelemetry Collector
+# - Grafana Alloy (unified telemetry gateway: Faro RUM + backend OTLP; and a
+#   second Alloy DaemonSet for node/pod log tailing)
 # - Demo microservices (Products Service, Orders Service & Shipping Service)
 
 set -e  # Exit on any error
@@ -144,16 +145,24 @@ print_header "Provisioning Grafana Dashboards"
 echo ""
 
 print_step "Applying dashboard ConfigMaps..."
+kubectl apply -f kind/dashboards/platform-home-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/apm-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/service-breakdown-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/k8s-dashboard-cm.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/logs-search-cm.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/service-overview-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/service-map-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/tracing-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/profiling-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/logs-analysis-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/executive-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/observability-overview-dashboard.yaml > /dev/null 2>&1
 kubectl apply -f kind/dashboards/slo-sli-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/synthetic-monitoring-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/frontend-rum-dashboard.yaml > /dev/null 2>&1
+kubectl apply -f kind/dashboards/k6-dashboard.yaml > /dev/null 2>&1
 
-print_success "8 dashboards provisioned (K8s, Logs Search, Service Overview, Tracing, Logs Analysis, Executive, Observability Overview, SLO/SLI)"
+print_success "16 dashboards provisioned (Platform Home, APM, Service Time Breakdown, K8s, Logs Search, Service Overview, Service Map, Tracing, Profiling, Logs Analysis, Executive, Observability Overview, SLO/SLI, Synthetic Monitoring, Frontend/RUM, k6 Load Testing)"
 echo ""
 
 # ============================================================================
@@ -170,14 +179,19 @@ print_step "Building Orders Service (Python)..."
 docker build -t orders-service:latest src/otel-python-app > /dev/null 2>&1
 print_success "Orders Service image built"
 
-print_step "Building Shipping Service (Java + Beyla eBPF)..."
+print_step "Building Shipping Service (Java + OTel Java agent; Beyla optional)..."
 docker build -t shipping-service:latest src/shipping-service > /dev/null 2>&1
 print_success "Shipping Service image built"
+
+print_step "Building Frontend (nginx + vendored Faro Web SDK)..."
+docker build -t frontend-service:latest src/frontend-app > /dev/null 2>&1
+print_success "Frontend image built"
 
 print_step "Loading images into Kind cluster..."
 kind load docker-image products-service:latest --name grafana-otel-demo > /dev/null 2>&1
 kind load docker-image orders-service:latest --name grafana-otel-demo > /dev/null 2>&1
 kind load docker-image shipping-service:latest --name grafana-otel-demo > /dev/null 2>&1
+kind load docker-image frontend-service:latest --name grafana-otel-demo > /dev/null 2>&1
 print_success "Images loaded into cluster"
 
 print_step "Creating demo namespace..."
@@ -211,6 +225,13 @@ helm upgrade --install shipping-service charts/shipping-service \
   -f charts/shipping-service/values.yaml \
   --wait --timeout 5m > /dev/null 2>&1
 print_success "Shipping Service deployed"
+
+print_step "Deploying Frontend (Faro RUM)..."
+helm upgrade --install frontend-app charts/frontend-app \
+  --namespace demo \
+  -f charts/frontend-app/values.yaml \
+  --wait --timeout 3m > /dev/null 2>&1
+print_success "Frontend deployed"
 
 echo ""
 print_success "All services deployed successfully"
@@ -247,7 +268,8 @@ verify_deployment "monitoring" "app.kubernetes.io/name=grafana" "Grafana"
 verify_deployment "monitoring" "app.kubernetes.io/name=prometheus" "Prometheus"
 verify_deployment "monitoring" "app.kubernetes.io/name=loki" "Loki"
 verify_deployment "monitoring" "app.kubernetes.io/name=tempo" "Tempo"
-verify_deployment "monitoring" "app.kubernetes.io/name=opentelemetry-collector" "OpenTelemetry Collector"
+verify_deployment "monitoring" "app.kubernetes.io/instance=alloy" "Grafana Alloy (gateway: Faro + OTLP backend)"
+verify_deployment "monitoring" "app.kubernetes.io/instance=alloy-logs" "Grafana Alloy (node logs DaemonSet)"
 verify_deployment "demo" "app.kubernetes.io/name=otel-demo-app" "Products Service"
 verify_deployment "demo" "app.kubernetes.io/name=otel-python-app" "Orders Service"
 verify_deployment "demo" "app.kubernetes.io/name=shipping-service" "Shipping Service"
@@ -343,6 +365,20 @@ print_success "Sample traffic generated successfully"
 echo ""
 
 # ============================================================================
+# DEMO READINESS CHECK
+# ============================================================================
+print_header "Demo Readiness Check"
+echo ""
+print_info "Validating the four signals, service map, exemplars, plugins and alerts..."
+echo ""
+if [ -x ./check.sh ]; then
+    ./check.sh || print_warning "Some checks aren't green yet — give it a minute and re-run ./check.sh"
+else
+    print_warning "check.sh not found or not executable; skipping readiness check"
+fi
+echo ""
+
+# ============================================================================
 # DNS CONFIGURATION REMINDER
 # ============================================================================
 print_header "Access Information"
@@ -371,15 +407,19 @@ echo -e "${CYAN}Demo Services:${NC}"
 echo -e "   Products Service:  ${BLUE}http://products.127.0.0.1.nip.io${NC}"
 echo -e "   Orders Service:    ${BLUE}http://orders.127.0.0.1.nip.io${NC}"
 echo -e "   Shipping Service:  ${BLUE}http://shipping.127.0.0.1.nip.io${NC}"
+echo -e "   Frontend (Faro):   ${BLUE}http://shop.127.0.0.1.nip.io${NC}"
 echo ""
 
 echo -e "${CYAN}Quick Start:${NC}"
 echo -e "   1. Open Grafana and explore the pre-built dashboards"
-echo -e "   2. Generate traffic: ${YELLOW}./traffic.sh${NC}"
-echo -e "   3. View traces in Tempo, logs in Loki, metrics in Prometheus"
+echo -e "   2. Generate baseline traffic: ${YELLOW}./traffic.sh --continuous --fast${NC}"
+echo -e "   3. Run the guided demo: ${YELLOW}see DEMO.md${NC}"
+echo -e "   4. Inject a live incident: ${YELLOW}./incident.sh${NC}"
+echo -e "   5. Explore queryless under ${YELLOW}Drilldown${NC} in the Grafana nav"
 echo ""
 
 echo -e "${CYAN}Documentation:${NC}"
+echo -e "   Demo Script:      DEMO.md"
 echo -e "   API Reference:    docs/API.md"
 echo -e "   Troubleshooting:  docs/TROUBLESHOOTING.md"
 echo -e "   Production Guide: docs/PRODUCTION.md"

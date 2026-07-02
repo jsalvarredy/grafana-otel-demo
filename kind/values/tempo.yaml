@@ -2,6 +2,7 @@ tempo:
   repository: grafana/tempo
   tag: 2.8.0
   memBallastSizeMbs: 128
+  reportingEnabled: false
   resources:
     requests:
       cpu: 250m
@@ -45,13 +46,61 @@ tempo:
     periodSeconds: 10
     failureThreshold: 5
 
-storage:
-  trace:
-    backend: local
-    local:
-      path: /var/tempo/traces
-    wal:
-      path: /var/tempo/wal
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+
+  # -------------------------------------------------------------------------
+  # Metrics generator: powers the APM Service Map / Node Graph and RED span
+  # metrics (the "Datadog APM map" experience). Tempo reads spans and writes:
+  #   - traces_service_graph_*  -> edges between services (the map)
+  #   - traces_spanmetrics_*    -> RED metrics derived from spans
+  # These are remote-written into Prometheus (needs the remote-write receiver
+  # enabled on the Prometheus server, see values/prometheus.yaml).
+  # -------------------------------------------------------------------------
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
+    processor:
+      service_graphs:
+        wait: 10s
+      span_metrics:
+        enable_target_info: true
+        # Promote db.system to a span-metrics label so the per-service time
+        # breakdown dashboard can split response time by component (PostgreSQL
+        # vs Redis vs MongoDB vs external vs app code). A single, low-cardinality
+        # dimension keeps the series count in check.
+        dimensions:
+          - db.system
+      # local-blocks keeps recent spans in the generator so TraceQL *metrics*
+      # ({ } | rate(), quantile_over_time(...)) work. This powers the Traces
+      # Drilldown (queryless trace exploration) and ad-hoc TraceQL metric queries.
+      local_blocks:
+        flush_to_storage: true
+    registry:
+      collection_interval: 15s
+      external_labels:
+        source: tempo
+    storage:
+      path: /var/tempo/generator/wal
+      remote_write:
+        - url: "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
+          send_exemplars: true
+    traces_storage:
+      path: /var/tempo/generator/traces
+
+  # Turn the generator processors on for the default (single) tenant.
+  overrides:
+    defaults:
+      metrics_generator:
+        processors:
+          - service-graphs
+          - span-metrics
+          - local-blocks
 
 persistence:
   enabled: false

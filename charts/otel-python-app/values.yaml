@@ -18,14 +18,16 @@ ingress:
 
 resources:
   limits:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 250m
+    memory: 256Mi
   requests:
-    cpu: 50m
-    memory: 64Mi
+    cpu: 100m
+    memory: 96Mi
 
 env:
   # OTEL Collector endpoint
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  # Attach trace exemplars to histogram samples (metric -> trace correlation).
+  OTEL_METRICS_EXEMPLAR_FILTER: "trace_based"
   # Products Service URL for inter-service communication
   PRODUCTS_SERVICE_URL: "http://otel-demo-app:8080"

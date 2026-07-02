@@ -1,0 +1,106 @@
+# Grafana Alloy - node log collector (DaemonSet).
+# ---------------------------------------------------------------------------
+# FASE 1 of the Alloy consolidation: this release REPLACES the old
+# `otel-logs-agent` (an OpenTelemetry Collector DaemonSet). It tails every
+# pod's logs and ships them to Loki, reproducing the exact labels the Loki
+# dashboards rely on (service_name, service_namespace, k8s_*).
+#
+# Why Alloy: Promtail is End-of-Life (2026-03-02) and Grafana Agent EOL
+# (2025-11-01); Alloy is Grafana's supported, go-forward telemetry collector.
+# All log collection now converges on Alloy.
+#
+# CRITICAL: shipping-service (Java) is instrumented by the OTel Java agent,
+# which emits traces+metrics but NOT logs. Its logs come ONLY from this node
+# agent (stdout tail), so `service_name` MUST stay "shipping-service" for the
+# Log Analysis / Logs Search dashboards to keep working.
+#
+# Log source: `loki.source.kubernetes` reads pod logs via the Kubernetes API
+# (kubelet), so NO host-path mounts are needed. RBAC (pods, pods/log,
+# namespaces) is granted by the chart's default ClusterRole (rbac.create).
+# The classic file-based tailing (loki.source.file over /var/log/pods) is the
+# alternative if API streaming ever becomes a bottleneck.
+
+controller:
+  type: daemonset
+
+alloy:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  configMap:
+    content: |-
+      // -------------------------------------------------------------------
+      // Discover every pod in the cluster.
+      // -------------------------------------------------------------------
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      // -------------------------------------------------------------------
+      // Reproduce the labels the old otel-logs-agent produced, so the Loki
+      // dashboards keep working unchanged:
+      //   service_name      <- app.kubernetes.io/name (chart/deployment name:
+      //                        otel-demo-app, otel-python-app, shipping-service,
+      //                        frontend-app). This is exactly what the OTLP
+      //                        path emitted; shipping-service depends on it.
+      //   service_namespace <- pod namespace (gives service_namespace="demo")
+      //   k8s_*             <- pod/namespace/container/node metadata
+      // -------------------------------------------------------------------
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "k8s_namespace_name"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "service_namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "k8s_pod_name"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "k8s_container_name"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_node_name"]
+          target_label  = "k8s_node_name"
+        }
+        // Primary: service_name from the app.kubernetes.io/name label.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          target_label  = "service_name"
+        }
+        // Fallback: if that label is absent (e.g. some infra pods), use the
+        // container name so no stream is left without a service_name. The
+        // regex only matches when service_name is still empty (starts with ";").
+        rule {
+          source_labels = ["service_name", "__meta_kubernetes_pod_container_name"]
+          separator     = ";"
+          regex         = "^;(.*)$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
+      }
+
+      // -------------------------------------------------------------------
+      // Tail the discovered pods (via the Kubernetes API) and push to Loki.
+      // -------------------------------------------------------------------
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
