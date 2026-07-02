@@ -1,5 +1,65 @@
 adminPassword: "Mikroways123"
 
+# Grafana 13 is NOT yet packaged in the Helm chart (the newest chart, 10.5.15,
+# still ships Grafana app v12.3.1). To actually run Grafana 13 we override the
+# image tag here. Grafana upgrades are backward compatible, so the 10.5.15 chart
+# works with the v13 image. Bump this as new 13.x patches ship.
+image:
+  tag: "13.1.0"
+
+# ===========================================================================
+# Grafana Drilldown apps (queryless exploration)
+# ---------------------------------------------------------------------------
+# Point-and-click exploration of each signal with NO PromQL/LogQL/TraceQL.
+# They show up under the "Drilldown" section of the Grafana nav:
+#   - Metrics Drilldown  (grafana-metricsdrilldown-app)  -> Prometheus
+#   - Logs Drilldown     (grafana-lokiexplore-app)       -> Loki
+#   - Traces Drilldown   (grafana-exploretraces-app)     -> Tempo
+#   - Profiles Drilldown (grafana-pyroscope-app)         -> Pyroscope
+# This is the single highest-impact "wow" for a live demo: anyone can explore
+# the telemetry without knowing a query language. It is exactly what Grafana
+# leads with in its own product demos since 2024.
+#
+# NOTE: Grafana v12+ ships these apps bundled (no install needed), but for
+# self-managed OSS the supported path is to declare them here so the demo
+# works regardless of the version the chart resolves to. They are pulled from
+# the Grafana plugin catalog at pod startup (needs egress to grafana.com).
+# Grafana Drilldown apps (queryless exploration): Metrics / Logs / Traces /
+# Profiles Drilldown — the highest-impact "wow" for a live demo (point-and-click,
+# no PromQL/LogQL/TraceQL). They are installed by an init container running
+# `grafana cli`, because on Grafana v12 the chart's declarative GF_INSTALL_PLUGINS
+# is deprecated and GF_PLUGINS_PREINSTALL did not reliably install on this image.
+# The init container writes into the shared /var/lib/grafana/plugins volume
+# before Grafana starts, so the apps are always present and the install is
+# reproducible. (Needs egress to grafana.com at startup.)
+extraInitContainers:
+  - name: install-drilldown-plugins
+    image: grafana/grafana:13.1.0
+    securityContext:
+      runAsUser: 472
+      runAsGroup: 472
+    command:
+      - sh
+      - -c
+      - |
+        for p in grafana-metricsdrilldown-app grafana-lokiexplore-app grafana-exploretraces-app grafana-pyroscope-app; do
+          grafana cli --pluginsDir /var/lib/grafana/plugins plugins install "$p" || true
+        done
+    volumeMounts:
+      - name: storage
+        mountPath: /var/lib/grafana
+
+# Make "Platform Home" the landing page after login. The dashboard sidecar
+# writes provisioned dashboards as files under /tmp/dashboards, using the
+# ConfigMap data key as the filename (foldersFromFilesStructure is off), so
+# platform-home.json lands at a predictable path.
+grafana.ini:
+  dashboards:
+    default_home_dashboard_path: /tmp/dashboards/platform-home.json
+  feature_toggles:
+    # Enable the newer trace/exemplar UX bits used by the APM views.
+    enable: traceqlEditor
+
 ingress:
   enabled: true
   ingressClassName: nginx
@@ -47,23 +107,68 @@ datasources:
         jsonData:
           nodeGraph:
             enabled: true
-          tracesToLogs:
+          # Trace -> Logs. The OTLP logs land in Loki with trace_id/span_id as
+          # STRUCTURED METADATA (not in the log body, not indexed labels), so the
+          # old tracesToLogs default (a |= "<traceID>" line filter) matched
+          # NOTHING. tracesToLogsV2 with a custom query filters by the structured
+          # metadata field instead, pulling every log line of the trace across all
+          # services: {service_name=~".+"} | trace_id="<id>".
+          tracesToLogsV2:
             datasourceUid: Loki
-            filterByTraceID: true
-            filterBySpanID: true
-            spanStartTimeShift: '-5m'
-            spanEndTimeShift: '5m'
+            spanStartTimeShift: '-2m'
+            spanEndTimeShift: '2m'
+            tags:
+              - key: service.name
+                value: service_name
+            filterByTraceID: false
+            filterBySpanID: false
+            customQuery: true
+            query: '{service_name=~".+"} | trace_id="$${__trace.traceId}"'
           tracesToMetrics:
             datasourceUid: Prometheus
             spanStartTimeShift: '-5m'
             spanEndTimeShift: '5m'
+            # Span metrics from Tempo carry the label `service` (NOT service_name),
+            # so map span service.name -> `service` for the {$__tags} expansion to
+            # match. (service_name here left the "Metrics for this span" button empty.)
+            tags:
+              - key: service.name
+                value: service
+            queries:
+              - name: 'Request rate (span metrics)'
+                query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))'
+              - name: 'P95 latency (span metrics)'
+                query: 'histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))'
+          # Trace -> Profile: from a span, jump to the Pyroscope flame graph for
+          # that service/time range ("Profiles for this span"). This closes the
+          # 4th correlation, so all four signals (metrics, logs, traces,
+          # profiles) link to each other. Node's SDK emits 'wall' profiles, and
+          # the span's service.name maps to the profile's service_name label.
+          tracesToProfiles:
+            datasourceUid: Pyroscope
+            profileTypeId: 'wall:wall:nanoseconds:wall:nanoseconds'
             tags:
               - key: service.name
                 value: service_name
+            customQuery: false
           lokiSearch:
             datasourceUid: Loki
+          # Service Map / Node Graph: Tempo builds the map from the
+          # traces_service_graph_* metrics that its generator writes to
+          # Prometheus. This is the "Datadog APM map" view.
           serviceMap:
             datasourceUid: Prometheus
+          spanBar:
+            type: 'Duration'
+
+      # Continuous profiling backend (flame graphs). Open-source equivalent of
+      # Datadog Continuous Profiler / New Relic profiling.
+      - name: Pyroscope
+        type: grafana-pyroscope-datasource
+        uid: Pyroscope
+        url: http://pyroscope.monitoring.svc.cluster.local:4040
+        access: proxy
+        jsonData: {}
 
 sidecar:
   dashboards:
@@ -72,3 +177,302 @@ sidecar:
     folder: /tmp/dashboards
     provider:
       allowUiUpdates: true
+
+# ===========================================================================
+# Grafana Alerting (provisioned)
+# ---------------------------------------------------------------------------
+# This is the open-source answer to Datadog "monitors" / New Relic alerts.
+# Rules are evaluated by Grafana and fire on the demo traffic, so the
+# Alerting UI and the dashboard annotations light up without any SaaS.
+# Threshold semantics: each rule runs a Prometheus query (refId A), reduces it
+# to a single number (refId B), and a threshold (refId C) decides firing.
+# ===========================================================================
+alerting:
+  rules.yaml:
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: slo-and-red
+        folder: Demo Alerts
+        interval: 1m
+        rules:
+          - uid: alert-high-error-rate
+            title: High error rate (>5%)
+            condition: C
+            for: 2m
+            annotations:
+              summary: "Global 5xx error rate is above 5% for the last 5 minutes"
+              runbook: "Open the Service Overview dashboard and the Tracing dashboard to find the failing service."
+            labels:
+              severity: critical
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: |
+                    (
+                      (sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) or vector(0))
+                      +
+                      (sum(rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m])) or vector(0))
+                    )
+                    /
+                    clamp_min(
+                      (sum(rate(http_requests_total[5m])) or vector(0))
+                      +
+                      (sum(rate(traces_spanmetrics_calls_total[5m])) or vector(0))
+                    , 1)
+                    * 100
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: reduce
+                  expression: A
+                  reducer: last
+                  refId: B
+              - refId: C
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [5] }
+
+          - uid: alert-high-latency-p95
+            title: High P95 latency (>500ms)
+            condition: C
+            for: 3m
+            annotations:
+              summary: "P95 request latency is above 500ms"
+            labels:
+              severity: warning
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: |
+                    histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: A, reducer: last, refId: B }
+              - refId: C
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [500] }
+
+          # Multi-window multi-burn-rate SLO alerts (Google SRE workbook).
+          # Firing requires BOTH a long and a short window to be burning: the
+          # long window confirms a real problem, the short window confirms it
+          # is still happening (kills flapping). Burn rates come from the
+          # recording rules in values/prometheus.yaml (burnrate = ratio/0.001).
+          - uid: alert-slo-burn-fast
+            title: SLO fast burn (2% budget in 1h)
+            condition: E
+            for: 2m
+            annotations:
+              summary: "Error budget burning fast: 1h AND 5m burn rate > 14.4x (99.9% SLO)"
+              runbook: "At 14.4x the 30-day budget is gone in ~2 days. Open the SLO/SLI dashboard and Service Overview to find the failing service."
+            labels:
+              severity: critical
+            data:
+              - refId: A
+                relativeTimeRange: { from: 3600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: job:http_errors:burnrate1h
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: job:http_errors:burnrate5m
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: B
+              - refId: C
+                relativeTimeRange: { from: 3600, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: A, reducer: last, refId: C }
+              - refId: D
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: B, reducer: last, refId: D }
+              - refId: E
+                relativeTimeRange: { from: 3600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: math
+                  expression: ${C} > 14.4 && ${D} > 14.4
+                  refId: E
+          - uid: alert-slo-burn-slow
+            title: SLO slow burn (5% budget in 6h)
+            condition: E
+            for: 15m
+            annotations:
+              summary: "Error budget burning: 6h AND 30m burn rate > 6x (99.9% SLO)"
+              runbook: "Slower burn; address within the day. See the SLO/SLI dashboard."
+            labels:
+              severity: warning
+            data:
+              - refId: A
+                relativeTimeRange: { from: 21600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: job:http_errors:burnrate6h
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 1800, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: job:http_errors:burnrate30m
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: B
+              - refId: C
+                relativeTimeRange: { from: 21600, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: A, reducer: last, refId: C }
+              - refId: D
+                relativeTimeRange: { from: 1800, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: B, reducer: last, refId: D }
+              - refId: E
+                relativeTimeRange: { from: 21600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: math
+                  expression: ${C} > 6 && ${D} > 6
+                  refId: E
+
+          - uid: alert-service-down
+            title: Service down (no requests)
+            condition: C
+            for: 2m
+            annotations:
+              summary: "A demo service has reported no traffic for 5 minutes (possible outage)"
+            labels:
+              severity: critical
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: |
+                    count(
+                      sum by (service_name) (rate(http_requests_total[5m]))
+                      or
+                      sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+                    )
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: A, reducer: last, refId: B }
+              - refId: C
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  refId: C
+                  conditions:
+                    - evaluator: { type: lt, params: [3] }
+
+          # Synthetic uptime: fires per failing endpoint (multi-dimensional by
+          # the `instance` label) when a blackbox probe reports down/non-2xx.
+          - uid: alert-synthetic-probe-down
+            title: Synthetic probe down
+            condition: C
+            for: 1m
+            annotations:
+              summary: "A synthetic blackbox probe is failing (endpoint down or non-2xx)"
+              runbook: "Open the Synthetic Monitoring dashboard; the instance label shows which URL is failing."
+            labels:
+              severity: critical
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: Prometheus
+                model:
+                  editorMode: code
+                  expr: probe_success
+                  instant: true
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+                  refId: A
+              - refId: B
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: __expr__
+                model: { type: reduce, expression: A, reducer: last, refId: B }
+              - refId: C
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: B
+                  refId: C
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+
+  contactpoints.yaml:
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: demo-default
+        receivers:
+          - uid: demo-default-receiver
+            type: webhook
+            settings:
+              # Points to the local Alertmanager-less webhook sink (the OTel
+              # collector is NOT it). In the demo we just need a valid default
+              # receiver so notifications don't error; alerts are viewed in the
+              # Grafana Alerting UI and as dashboard annotations.
+              url: http://localhost:9094/
+            disableResolveMessage: false
+
+  policies.yaml:
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: demo-default
+        group_by: ['alertname']
+        group_wait: 30s
+        group_interval: 2m
+        repeat_interval: 4h
+
