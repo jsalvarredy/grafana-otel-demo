@@ -1,0 +1,583 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-home-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: '1'
+data:
+  platform-home.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "enable": true,
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "hide": false,
+            "iconColor": "red",
+            "name": "Firing alerts",
+            "titleFormat": "{{alertname}}",
+            "useValueForTime": false
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "red",
+            "name": "Deploys & Incidents",
+            "target": {
+              "limit": 100,
+              "matchAny": true,
+              "tags": [
+                "deploy",
+                "incident"
+              ],
+              "type": "tags"
+            }
+          }
+        ]
+      },
+      "description": "Start here. One-glance health of the whole platform plus shortcuts to every view. Open-source observability with the Grafana stack (Prometheus, Loki, Tempo, Pyroscope) instrumented via OpenTelemetry SDK and Beyla eBPF.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": true,
+          "keepTime": true,
+          "tags": [
+            "apm"
+          ],
+          "targetBlank": false,
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
+        }
+      ],
+      "panels": [
+        {
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "code": {
+              "language": "html",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "<div style=\"display:flex;align-items:center;gap:18px;padding:8px 4px\">\n  <div style=\"width:10px;height:46px;background:linear-gradient(180deg,#F46800,#8F3BB8);border-radius:3px\"></div>\n  <div>\n    <div style=\"font-size:28px;font-weight:800;color:#fff;letter-spacing:.3px\">Observability Platform</div>\n    <div style=\"font-size:13px;color:#9aa0a6;margin-top:2px\">Metrics &middot; Logs &middot; Traces &middot; Profiles &mdash; one stack, your infrastructure, zero per-host licensing</div>\n  </div>\n  <div style=\"margin-left:auto;text-align:right;font-size:12px;color:#9aa0a6\">Prometheus &bull; Loki &bull; Tempo &bull; Pyroscope<br/>OpenTelemetry SDK + Beyla eBPF</div>\n</div>",
+            "mode": "html"
+          },
+          "transparent": true,
+          "type": "text"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 3
+          },
+          "id": 2,
+          "panels": [],
+          "title": "Golden Signals (all services)",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Total request throughput across every service (SDK + Beyla).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#3274D9",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 0,
+            "y": 4
+          },
+          "id": 10,
+          "options": {
+            "colorMode": "background_solid",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum(rate(http_requests_total[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0))",
+              "legendFormat": "Throughput",
+              "refId": "A"
+            }
+          ],
+          "title": "Throughput",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Share of 5xx responses across the platform over the last 5 minutes.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 6,
+            "y": 4
+          },
+          "id": 11,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0)), 1) * 100",
+              "legendFormat": "Error rate",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "95th percentile request latency (SDK histogram).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 200
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 4
+          },
+          "id": 12,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "legendFormat": "P95",
+              "refId": "A"
+            }
+          ],
+          "title": "P95 Latency",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Number of services currently reporting telemetry.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#8F3BB8",
+                "mode": "fixed"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8F3BB8",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 18,
+            "y": 4
+          },
+          "id": 13,
+          "options": {
+            "colorMode": "background_solid",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(count(count by (service_name) (rate(http_requests_total[5m])) or count by (service_name) (rate(http_server_request_duration_seconds_count[5m]))) or vector(0))",
+              "legendFormat": "Active services",
+              "refId": "A"
+            }
+          ],
+          "title": "Active Services",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Request rate per service. Click a series to follow it into the Service Overview.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "opacity",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 16,
+            "x": 0,
+            "y": 9
+          },
+          "id": 20,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "legendFormat": "{{service_name}}",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
+              "legendFormat": "{{service_name}}",
+              "refId": "B"
+            }
+          ],
+          "title": "Traffic by Service",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Currently firing Grafana alerts. Quiet is good.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 9
+          },
+          "id": 21,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+              "legendFormat": "Firing alerts",
+              "refId": "A"
+            }
+          ],
+          "title": "Active Alerts",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 17
+          },
+          "id": 3,
+          "panels": [],
+          "title": "Explore",
+          "type": "row"
+        },
+        {
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 18
+          },
+          "id": 30,
+          "options": {
+            "code": {
+              "language": "html",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "<div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:6px 2px\">\n  <a href=\"/d/apm-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">APM</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Apdex, response time, throughput &amp; errors per service &mdash; New Relic-style.</div></div></a>\n  <a href=\"/d/service-breakdown\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Time Breakdown</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Response time split by component: app vs Postgres, Redis, Mongo &amp; external.</div></div></a>\n  <a href=\"/d/apm-service-map\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Map</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Who calls whom, with live rate &amp; latency on each edge.</div></div></a>\n  <a href=\"/d/otel-service-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Overview</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">RED metrics, latency percentiles, per-endpoint table.</div></div></a>\n  <a href=\"/d/super-traces-poc-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Distributed Tracing</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Errors &amp; slow traces, full span waterfalls in Tempo.</div></div></a>\n  <a href=\"/d/super-logs-poc-v3\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Logs &amp; Analysis</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Structured logs in Loki, correlated to traces by trace_id.</div></div></a>\n  <a href=\"/d/apm-profiling\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Continuous Profiling</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">CPU flame graphs from Pyroscope. Free here, paid in SaaS.</div></div></a>\n  <a href=\"/d/slo-sli-error-budget-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">SLO / Error Budget</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Availability, burn rate and remaining error budget.</div></div></a>\n</div>",
+            "mode": "html"
+          },
+          "transparent": true,
+          "type": "text"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": [
+        "apm",
+        "otel",
+        "home"
+      ],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "1h"
+        ],
+        "time_options": [
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "3h",
+          "6h",
+          "12h",
+          "24h"
+        ]
+      },
+      "timezone": "",
+      "title": "Platform Home",
+      "uid": "platform-home",
+      "version": 1,
+      "weekStart": ""
+    }

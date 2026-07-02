@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-map-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  service-map.json: |
+    {
+      "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+      "description": "APM Service Map and dependencies, built from Tempo's metrics generator (traces_service_graph_*). Who calls whom, with request rate, latency and errors on every edge.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [ { "asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["apm"], "targetBlank": false, "title": "APM Dashboards", "tooltip": "Jump to another dashboard", "type": "dashboards", "url": "" } ],
+      "panels": [
+        {
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "options": { "code": { "language": "html", "showLineNumbers": false, "showMiniMap": false }, "content": "<div style=\"padding:6px 0\">\n  <div style=\"font-size:24px;font-weight:700;color:#fff\">Service Map &mdash; Application Dependencies</div>\n  <div style=\"font-size:13px;color:#8e8e8e;margin-top:4px\">Built automatically from traces by <strong style=\"color:#8F3BB8\">Tempo's metrics generator</strong>. Each node is a service; each edge is a real call observed in a trace, annotated with request rate and latency. The open-source equivalent of the Datadog/New Relic APM map.</div>\n</div>", "mode": "html" },
+          "transparent": true,
+          "type": "text"
+        },
+        {
+          "datasource": { "type": "tempo", "uid": "Tempo" },
+          "description": "Live service dependency graph from Tempo. Nodes are services; edges are observed calls. If the graph is slow to appear, widen the time range — it needs a few minutes of traces.",
+          "gridPos": { "h": 14, "w": 14, "x": 0, "y": 3 },
+          "id": 2,
+          "options": {},
+          "targets": [ { "datasource": { "type": "tempo", "uid": "Tempo" }, "queryType": "serviceMap", "refId": "A" } ],
+          "title": "Service Dependency Graph (live)",
+          "type": "nodeGraph"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Same dependencies as a ranked table — always populated, easy to read at a glance.",
+          "fieldConfig": {
+            "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "left", "cellOptions": { "type": "auto" }, "filterable": true }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }, "unit": "reqps" },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Calls/sec" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "color", "properties": [] } ] }
+            ]
+          },
+          "gridPos": { "h": 14, "w": 10, "x": 14, "y": 3 },
+          "id": 3,
+          "options": { "showHeader": true, "sortBy": [ { "displayName": "Calls/sec", "desc": true } ] },
+          "pluginVersion": "10.5.0",
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum by (client, server) (rate(traces_service_graph_request_total[$__rate_interval]))", "format": "table", "instant": true, "legendFormat": "", "refId": "A" } ],
+          "title": "Top Dependencies",
+          "transformations": [
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "__metrics_gen_instance": true, "source": true, "__name__": true, "job": true, "instance": true }, "renameByName": { "client": "From (client)", "server": "To (server)", "Value": "Calls/sec" } } }
+          ],
+          "type": "table"
+        },
+        { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }, "id": 10, "title": "Dependency health (per edge)", "type": "row" },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Request rate for each client -> server dependency observed in traces.",
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity", "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never", "stacking": { "group": "A", "mode": "none" } }, "unit": "reqps" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "id": 11,
+          "options": { "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum by (client, server) (rate(traces_service_graph_request_total[$__rate_interval]))", "legendFormat": "{{client}} -> {{server}}", "refId": "A" } ],
+          "title": "Request Rate per Dependency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "P95 server-side latency for each dependency (from the service graph histogram).",
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" }, "unit": "s" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+          "id": 12,
+          "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "histogram_quantile(0.95, sum by (client, server, le) (rate(traces_service_graph_request_server_seconds_bucket[$__rate_interval])))", "legendFormat": "{{client}} -> {{server}}", "refId": "A" } ],
+          "title": "P95 Latency per Dependency",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "description": "Failed calls per dependency. Flat at zero is healthy.",
+          "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "showPoints": "never", "stacking": { "group": "A", "mode": "normal" } }, "unit": "reqps" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+          "id": 13,
+          "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [ { "datasource": { "type": "prometheus", "uid": "Prometheus" }, "expr": "sum by (client, server) (rate(traces_service_graph_request_failed_total[$__rate_interval])) or (sum by (client, server) (rate(traces_service_graph_request_total[$__rate_interval])) * 0)", "legendFormat": "{{client}} -> {{server}}", "refId": "A" } ],
+          "title": "Failed Calls per Dependency",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["apm", "otel", "service-map", "tempo"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": { "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "1h"] },
+      "timezone": "",
+      "title": "APM - Service Map",
+      "uid": "apm-service-map",
+      "version": 2,
+      "weekStart": ""
+    }

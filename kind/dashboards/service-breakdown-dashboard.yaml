@@ -1,0 +1,1389 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-breakdown-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: '1'
+data:
+  service-breakdown.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "enable": true,
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "hide": false,
+            "iconColor": "red",
+            "name": "Firing alerts",
+            "titleFormat": "{{alertname}}",
+            "useValueForTime": false
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "red",
+            "name": "Deploys & Incidents",
+            "target": {
+              "limit": 100,
+              "matchAny": true,
+              "tags": [
+                "deploy",
+                "incident"
+              ],
+              "type": "tags"
+            }
+          }
+        ]
+      },
+      "description": "New Relic-style transaction time breakdown per service: response time split into App, PostgreSQL, Redis, MongoDB and External services, derived from OpenTelemetry span metrics (db.system) in Tempo. Pick a service with the Service variable.",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": true,
+          "keepTime": true,
+          "tags": [
+            "apm"
+          ],
+          "targetBlank": false,
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
+        }
+      ],
+      "liveNow": false,
+      "panels": [
+        {
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 3
+          },
+          "id": 1,
+          "transparent": true,
+          "type": "text",
+          "options": {
+            "mode": "html",
+            "code": {
+              "language": "html",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "<div style=\"display:flex;align-items:center;gap:18px;padding:8px 4px\">\n  <div style=\"width:10px;height:46px;background:linear-gradient(180deg,#F46800,#8F3BB8);border-radius:3px\"></div>\n  <div>\n    <div style=\"font-size:26px;font-weight:800;color:#fff\">Service Time Breakdown</div>\n    <div style=\"font-size:13px;color:#9aa0a6;margin-top:2px\">Where does the response time go? Response time split into <b>App</b> &middot; <b>PostgreSQL</b> &middot; <b>Redis</b> &middot; <b>MongoDB</b> &middot; <b>External</b> &mdash; the New Relic transaction-breakdown view, on OpenTelemetry span metrics. Pick a <b>Service</b> above.</div>\n  </div>\n  <div style=\"margin-left:auto;text-align:right;font-size:12px;color:#9aa0a6\">App = server time &minus; time in dependencies<br/>Tempo span metrics &rarr; Prometheus</div>\n</div>"
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 24,
+            "h": 1
+          },
+          "id": 2,
+          "panels": [],
+          "title": "Service summary",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 3,
+          "title": "Avg response time",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 4,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "decimals": 1,
+              "color": {
+                "mode": "thresholds",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 250
+                  },
+                  {
+                    "color": "red",
+                    "value": 1000
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 4,
+          "title": "Throughput",
+          "type": "stat",
+          "gridPos": {
+            "x": 6,
+            "y": 4,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "60 * sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval]))",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 5,
+          "title": "Error rate",
+          "type": "stat",
+          "gridPos": {
+            "x": 12,
+            "y": 4,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "color": {
+                "mode": "thresholds",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "100 * (sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\",status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 6,
+          "title": "Time in app code",
+          "type": "stat",
+          "gridPos": {
+            "x": 18,
+            "y": 4,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "color": {
+                "mode": "thresholds",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "100 * clamp_min(sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval])), 0) / clamp_min(sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.0000001)",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 24,
+            "h": 1
+          },
+          "id": 7,
+          "panels": [],
+          "title": "Response time breakdown by component",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 8,
+          "title": "Average response time by component (ms / request)",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 9,
+            "w": 16,
+            "h": 11
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 1,
+                "fillOpacity": 40,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                },
+                "axisPlacement": "auto",
+                "gradientMode": "opacity"
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "App (compute)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PostgreSQL"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#5794F2"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Redis"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#E02F44"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MongoDB"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#56A64B"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "External services"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#B877D9"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "clamp_min(1000 * (sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval]))) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001), 0)",
+              "refId": "A",
+              "legendFormat": "App (compute)"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"postgresql\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "B",
+              "legendFormat": "PostgreSQL"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"redis\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "C",
+              "legendFormat": "Redis"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"mongodb\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "D",
+              "legendFormat": "MongoDB"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "E",
+              "legendFormat": "External services"
+            }
+          ],
+          "description": "Stacked average time each request spends in every component. The stack height equals the average response time; App is the server self-time (not spent waiting on a dependency)."
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 9,
+          "title": "Time share by component (current)",
+          "type": "piechart",
+          "gridPos": {
+            "x": 16,
+            "y": 9,
+            "w": 8,
+            "h": 11
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "App (compute)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PostgreSQL"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#5794F2"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Redis"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#E02F44"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MongoDB"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#56A64B"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "External services"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#B877D9"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "pieType": "donut",
+            "displayLabels": [
+              "percent"
+            ],
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": [
+                "value",
+                "percent"
+              ],
+              "showLegend": true
+            },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "clamp_min(1000 * (sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval]))) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001), 0)",
+              "refId": "A",
+              "legendFormat": "App (compute)",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"postgresql\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "B",
+              "legendFormat": "PostgreSQL",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"redis\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "C",
+              "legendFormat": "Redis",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"mongodb\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "D",
+              "legendFormat": "MongoDB",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])), 0.001)",
+              "refId": "E",
+              "legendFormat": "External services",
+              "instant": true,
+              "range": false
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 1
+          },
+          "id": 10,
+          "panels": [],
+          "title": "Where the time goes & call volume",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 11,
+          "title": "Total time spent by component (ms of work / sec)",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 1,
+                "fillOpacity": 40,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                },
+                "axisPlacement": "auto",
+                "gradientMode": "opacity"
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "App (compute)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PostgreSQL"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#5794F2"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Redis"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#E02F44"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MongoDB"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#56A64B"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "External services"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#B877D9"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "clamp_min(1000 * (sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])) - sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval]))), 0)",
+              "refId": "A",
+              "legendFormat": "App (compute)"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"postgresql\"}[$__rate_interval]))",
+              "refId": "B",
+              "legendFormat": "PostgreSQL"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"redis\"}[$__rate_interval]))",
+              "refId": "C",
+              "legendFormat": "Redis"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=\"mongodb\"}[$__rate_interval]))",
+              "refId": "D",
+              "legendFormat": "MongoDB"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum(rate(traces_spanmetrics_latency_sum{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval]))",
+              "refId": "E",
+              "legendFormat": "External services"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 12,
+          "title": "Call rate by component (ops / sec)",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 12,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "axisPlacement": "auto",
+                "gradientMode": "opacity"
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (app)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PostgreSQL"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#5794F2"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Redis"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#E02F44"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MongoDB"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#56A64B"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "External services"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#B877D9"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval]))",
+              "refId": "A",
+              "legendFormat": "Requests (app)"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",db_system=\"postgresql\"}[$__rate_interval]))",
+              "refId": "B",
+              "legendFormat": "PostgreSQL"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",db_system=\"redis\"}[$__rate_interval]))",
+              "refId": "C",
+              "legendFormat": "Redis"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",db_system=\"mongodb\"}[$__rate_interval]))",
+              "refId": "D",
+              "legendFormat": "MongoDB"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(rate(traces_spanmetrics_calls_total{service=~\"$service\",span_kind=\"SPAN_KIND_CLIENT\",db_system=\"\"}[$__rate_interval]))",
+              "refId": "E",
+              "legendFormat": "External services"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 29,
+            "w": 24,
+            "h": 1
+          },
+          "id": 13,
+          "panels": [],
+          "title": "Datastore operations",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "id": 14,
+          "type": "table",
+          "title": "Datastore operations \u2014 latency per call & time consumed (Postgres / Redis / Mongo)",
+          "gridPos": {
+            "x": 0,
+            "y": 30,
+            "w": 24,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "filterable": false
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Avg latency / call (ms)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background",
+                      "mode": "gradient"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 50
+                        },
+                        {
+                          "color": "red",
+                          "value": 150
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p95 latency / call (ms)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Calls / sec"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "reqps"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Total time (ms/s)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Total time (ms/s)",
+                "desc": true
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum by (db_system) (rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])) / clamp_min(sum by (db_system) (rate(traces_spanmetrics_calls_total{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])), 0.001)",
+              "refId": "A",
+              "format": "table",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * histogram_quantile(0.95, sum by (le, db_system) (rate(traces_spanmetrics_latency_bucket{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval])))",
+              "refId": "B",
+              "format": "table",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (db_system) (rate(traces_spanmetrics_calls_total{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval]))",
+              "refId": "C",
+              "format": "table",
+              "instant": true,
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "1000 * sum by (db_system) (rate(traces_spanmetrics_latency_sum{service=~\"$service\",db_system=~\"postgresql|redis|mongodb\"}[$__rate_interval]))",
+              "refId": "D",
+              "format": "table",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "db_system": "Component",
+                  "Value #A": "Avg latency / call (ms)",
+                  "Value #B": "p95 latency / call (ms)",
+                  "Value #C": "Calls / sec",
+                  "Value #D": "Total time (ms/s)"
+                },
+                "indexByName": {
+                  "db_system": 0,
+                  "Value #A": 1,
+                  "Value #B": 2,
+                  "Value #C": 3,
+                  "Value #D": 4
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": [
+        "apm",
+        "otel",
+        "breakdown"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "definition": "label_values(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}, service)",
+            "query": {
+              "query": "label_values(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}, service)",
+              "refId": "service"
+            },
+            "includeAll": false,
+            "multi": false,
+            "current": {
+              "selected": true,
+              "text": "products-service",
+              "value": "products-service"
+            },
+            "refresh": 2,
+            "sort": 1
+          }
+        ]
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "1h"
+        ],
+        "time_options": [
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "3h",
+          "6h",
+          "12h",
+          "24h"
+        ]
+      },
+      "timezone": "",
+      "title": "Service Time Breakdown",
+      "uid": "service-breakdown",
+      "version": 1,
+      "weekStart": ""
+    }

@@ -497,6 +497,57 @@ function emitLog(severity, message, attributes = {}) {
   }));
 }
 
+// ===================================================================
+// TRACING HELPERS
+// ===================================================================
+//
+// withSpan() runs `fn` inside an ACTIVE span. This is the key to correct
+// distributed tracing: startActiveSpan installs the span in the OpenTelemetry
+// context, so (a) any child span created inside `fn` nests underneath it
+// (producing a proper waterfall in Tempo), and (b) trace.getActiveSpan() used
+// by emitLog() resolves to this span, so every log line carries the right
+// trace_id/span_id and logs correlate to traces.
+//
+// The previous implementation used tracer.startSpan({ parent: span }), but the
+// `parent` option does not exist in the current OTel JS API, so spans ended up
+// flat (all roots) and logs had empty trace ids.
+const appTracer = trace.getTracer('products-service');
+
+async function withSpan(name, fn, attributes = {}) {
+  return appTracer.startActiveSpan(name, async (span) => {
+    try {
+      for (const [k, v] of Object.entries(attributes)) {
+        span.setAttribute(k, v);
+      }
+      return await fn(span);
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+// Synchronous variant for child spans inside an already-active span.
+function withSpanSync(name, fn, attributes = {}) {
+  return appTracer.startActiveSpan(name, (span) => {
+    try {
+      for (const [k, v] of Object.entries(attributes)) {
+        span.setAttribute(k, v);
+      }
+      return fn(span);
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
 // Simulate database latency with load-based variation
 const simulateDbLatency = async (operation = 'read') => {
   // Base latency
@@ -559,6 +610,43 @@ function checkRateLimit(ip) {
     return false;
   }
   return true;
+}
+
+// ===================================================================
+// SIMULATED BACKEND DEPENDENCIES (power the per-service time breakdown)
+// ===================================================================
+//
+// The demo has no real datastores, so these helpers emit child spans that look
+// like calls to PostgreSQL, Redis and MongoDB. Each span carries `db.system`
+// per the OpenTelemetry semantic conventions; Tempo's span-metrics generator
+// promotes db.system to a Prometheus label, which lets the "Service Time
+// Breakdown" dashboard split response time by component (database vs cache vs
+// document store vs app code) the way Datadog/New Relic APM does. The latencies
+// mimic each backend's typical profile.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Redis: in-memory cache, sub-millisecond to a few ms.
+function withRedis(operation, fn) {
+  return withSpan(`redis ${operation}`, async () => {
+    await sleep(1 + Math.random() * 4);
+    return fn ? await fn() : undefined;
+  }, { 'db.system': 'redis', 'db.operation': operation, 'net.peer.name': 'redis' });
+}
+
+// MongoDB: document store, a little slower than the cache.
+function withMongo(collection, operation, fn) {
+  return withSpan(`mongodb ${operation} ${collection}`, async () => {
+    await sleep(8 + Math.random() * 25);
+    return fn ? await fn() : undefined;
+  }, { 'db.system': 'mongodb', 'db.operation': operation, 'db.mongodb.collection': collection, 'net.peer.name': 'mongodb' });
+}
+
+// PostgreSQL: relational store, reuses the existing load-aware latency model.
+function withPostgres(operation, table, fn) {
+  return withSpan(`postgresql ${operation} ${table}`, async () => {
+    await simulateDbLatency(operation === 'INSERT' || operation === 'UPDATE' ? 'write' : 'read');
+    return fn ? await fn() : undefined;
+  }, { 'db.system': 'postgresql', 'db.operation': operation, 'db.sql.table': table, 'net.peer.name': 'postgres' });
 }
 
 // Circuit breaker check
@@ -675,15 +763,12 @@ app.use((req, res, next) => {
 
 // Root endpoint
 app.get('/', (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('handle-root-request');
+  withSpanSync('handle-root-request', () => {
+    emitLog('INFO', 'Received request on root endpoint', {
+      path: '/',
+      method: 'GET'
+    });
 
-  emitLog('INFO', 'Received request on root endpoint', {
-    path: '/',
-    method: 'GET'
-  });
-
-  setTimeout(() => {
-    span.end();
     res.json({
       service: 'Products Service',
       version: '2.0.0',
@@ -703,554 +788,507 @@ app.get('/', (req, res) => {
       totalProducts: products.length,
       categories: [...new Set(products.map(p => p.category))]
     });
-  }, 50);
+  });
 });
 
 // Get all products with advanced filtering
 app.get('/api/products', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-all-products');
-
   try {
-    const { category, minPrice, maxPrice, minRating, sort, limit = 50, offset = 0 } = req.query;
+    return await withSpan('get-all-products', async (span) => {
+      const { category, minPrice, maxPrice, minRating, sort, limit = 50, offset = 0 } = req.query;
 
-    // Check cache first
-    const cacheKey = `products:${JSON.stringify(req.query)}`;
-    const cached = getCached(cacheKey);
+      // Check cache first
+      const cacheKey = `products:${JSON.stringify(req.query)}`;
+      const cached = await withRedis('GET', () => getCached(cacheKey));
 
-    if (cached) {
-      span.setAttribute('cache.hit', true);
-      emitLog('INFO', 'Returning cached products', { cache_hit: true });
-      span.end();
-      return res.json(cached);
-    }
-
-    span.setAttribute('cache.hit', false);
-
-    emitLog('INFO', 'Fetching products', {
-      endpoint: '/api/products',
-      category: category || 'all',
-      filters: { minPrice, maxPrice, minRating }
-    });
-
-    // Check circuit breaker
-    if (!checkCircuitBreaker()) {
-      emitLog('WARNING', 'Circuit breaker is open, returning cached data');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Circuit breaker open' });
-      span.end();
-      return res.status(503).json({ error: 'Service temporarily unavailable' });
-    }
-
-    // Simulate database query
-    const dbSpan = trace.getTracer('products-service').startSpan('db-query-products', {
-      parent: span,
-    });
-    dbSpan.setAttribute('db.system', 'postgresql');
-    dbSpan.setAttribute('db.operation', 'SELECT');
-    dbSpan.setAttribute('db.table', 'products');
-
-    await simulateDbLatency('read');
-
-    let filteredProducts = [...products];
-
-    // Apply filters
-    if (category) {
-      filteredProducts = filteredProducts.filter(p => p.category === category);
-    }
-    if (minPrice) {
-      filteredProducts = filteredProducts.filter(p => p.price >= parseFloat(minPrice));
-    }
-    if (maxPrice) {
-      filteredProducts = filteredProducts.filter(p => p.price <= parseFloat(maxPrice));
-    }
-    if (minRating) {
-      filteredProducts = filteredProducts.filter(p => p.rating >= parseFloat(minRating));
-    }
-
-    // Apply sorting
-    if (sort) {
-      switch (sort) {
-        case 'price_asc':
-          filteredProducts.sort((a, b) => a.price - b.price);
-          break;
-        case 'price_desc':
-          filteredProducts.sort((a, b) => b.price - a.price);
-          break;
-        case 'rating':
-          filteredProducts.sort((a, b) => b.rating - a.rating);
-          break;
-        case 'popularity':
-          filteredProducts.sort((a, b) => b.popularity - a.popularity);
-          break;
+      if (cached) {
+        span.setAttribute('cache.hit', true);
+        emitLog('INFO', 'Returning cached products', { cache_hit: true });
+        return res.json(cached);
       }
-    }
 
-    // Apply pagination
-    const paginatedProducts = filteredProducts.slice(
-      parseInt(offset),
-      parseInt(offset) + parseInt(limit)
-    );
+      span.setAttribute('cache.hit', false);
 
-    dbSpan.end();
-    recordCircuitBreakerSuccess();
+      emitLog('INFO', 'Fetching products', {
+        endpoint: '/api/products',
+        category: category || 'all',
+        filters: { minPrice, maxPrice, minRating }
+      });
 
-    productViewCounter.add(paginatedProducts.length, {
-      category: category || 'all',
+      // Check circuit breaker
+      if (!checkCircuitBreaker()) {
+        emitLog('WARNING', 'Circuit breaker is open, returning cached data');
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Circuit breaker open' });
+        return res.status(503).json({ error: 'Service temporarily unavailable' });
+      }
+
+      // Simulate database query (nested under the active request span)
+      let filteredProducts = await withSpan('db-query-products', async () => {
+        await simulateDbLatency('read');
+        let result = [...products];
+
+        // Apply filters
+        if (category) {
+          result = result.filter(p => p.category === category);
+        }
+        if (minPrice) {
+          result = result.filter(p => p.price >= parseFloat(minPrice));
+        }
+        if (maxPrice) {
+          result = result.filter(p => p.price <= parseFloat(maxPrice));
+        }
+        if (minRating) {
+          result = result.filter(p => p.rating >= parseFloat(minRating));
+        }
+        return result;
+      }, { 'db.system': 'postgresql', 'db.operation': 'SELECT', 'db.table': 'products' });
+
+      // Apply sorting
+      if (sort) {
+        switch (sort) {
+          case 'price_asc':
+            filteredProducts.sort((a, b) => a.price - b.price);
+            break;
+          case 'price_desc':
+            filteredProducts.sort((a, b) => b.price - a.price);
+            break;
+          case 'rating':
+            filteredProducts.sort((a, b) => b.rating - a.rating);
+            break;
+          case 'popularity':
+            filteredProducts.sort((a, b) => b.popularity - a.popularity);
+            break;
+        }
+      }
+
+      // Apply pagination
+      const paginatedProducts = filteredProducts.slice(
+        parseInt(offset),
+        parseInt(offset) + parseInt(limit)
+      );
+
+      recordCircuitBreakerSuccess();
+
+      productViewCounter.add(paginatedProducts.length, {
+        category: category || 'all',
+      });
+
+      const response = {
+        products: paginatedProducts,
+        total: filteredProducts.length,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: parseInt(offset) + parseInt(limit) < filteredProducts.length
+      };
+
+      // Cache the response
+      await withRedis('SETEX', () => setCache(cacheKey, response));
+
+      emitLog('INFO', 'Products retrieved successfully', {
+        count: paginatedProducts.length,
+        total: filteredProducts.length,
+        category: category || 'all'
+      });
+
+      span.setAttribute('products.count', paginatedProducts.length);
+      res.json(response);
     });
-
-    const response = {
-      products: paginatedProducts,
-      total: filteredProducts.length,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      hasMore: parseInt(offset) + parseInt(limit) < filteredProducts.length
-    };
-
-    // Cache the response
-    setCache(cacheKey, response);
-
-    emitLog('INFO', 'Products retrieved successfully', {
-      count: paginatedProducts.length,
-      total: filteredProducts.length,
-      category: category || 'all'
-    });
-
-    span.setAttribute('products.count', paginatedProducts.length);
-    span.end();
-
-    res.json(response);
   } catch (error) {
     recordCircuitBreakerFailure();
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
-
     emitLog('ERROR', 'Error fetching products', {
       error: error.message
     });
-
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Search products
 app.get('/api/products/search', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('search-products');
-
   try {
-    const { q, limit = 20 } = req.query;
+    return await withSpan('search-products', async (span) => {
+      const { q, limit = 20 } = req.query;
 
-    if (!q) {
-      span.end();
-      return res.status(400).json({ error: 'Search query required' });
-    }
+      if (!q) {
+        return res.status(400).json({ error: 'Search query required' });
+      }
 
-    span.setAttribute('search.query', q);
-    searchQueryCounter.add(1, { service: 'products-service' });
+      span.setAttribute('search.query', q);
+      searchQueryCounter.add(1, { service: 'products-service' });
 
-    emitLog('INFO', 'Searching products', {
-      endpoint: '/api/products/search',
-      query: q
-    });
+      emitLog('INFO', 'Searching products', {
+        endpoint: '/api/products/search',
+        query: q
+      });
 
-    // Simulate search latency (slightly slower than regular queries)
-    await simulateDbLatency('read');
-    await new Promise(resolve => setTimeout(resolve, 50));
+      // Query the relational store for matching products (simulated PostgreSQL)
+      await withPostgres('SELECT', 'products', () => sleep(50));
 
-    const searchTerm = q.toLowerCase();
-    const results = products.filter(p =>
-      p.name.toLowerCase().includes(searchTerm) ||
-      p.description.toLowerCase().includes(searchTerm) ||
-      p.tags.some(t => t.includes(searchTerm)) ||
-      p.category.includes(searchTerm) ||
-      p.brand.toLowerCase().includes(searchTerm)
-    ).slice(0, parseInt(limit));
+      const searchTerm = q.toLowerCase();
+      const results = products.filter(p =>
+        p.name.toLowerCase().includes(searchTerm) ||
+        p.description.toLowerCase().includes(searchTerm) ||
+        p.tags.some(t => t.includes(searchTerm)) ||
+        p.category.includes(searchTerm) ||
+        p.brand.toLowerCase().includes(searchTerm)
+      ).slice(0, parseInt(limit));
 
-    // Sort by relevance (popularity for now)
-    results.sort((a, b) => b.popularity - a.popularity);
+      // Sort by relevance (popularity for now)
+      results.sort((a, b) => b.popularity - a.popularity);
 
-    searchResultsHistogram.record(results.length, { query_type: 'text' });
+      searchResultsHistogram.record(results.length, { query_type: 'text' });
 
-    emitLog('INFO', 'Search completed', {
-      query: q,
-      results_count: results.length
-    });
+      emitLog('INFO', 'Search completed', {
+        query: q,
+        results_count: results.length
+      });
 
-    span.setAttribute('search.results_count', results.length);
-    span.end();
-
-    res.json({
-      query: q,
-      results,
-      total: results.length
+      span.setAttribute('search.results_count', results.length);
+      res.json({
+        query: q,
+        results,
+        total: results.length
+      });
     });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
-
     emitLog('ERROR', 'Search error', {
       error: error.message
     });
-
     res.status(500).json({ error: 'Search failed' });
   }
 });
 
 // Get product by ID
 app.get('/api/products/:id', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-product-by-id');
   const productId = parseInt(req.params.id);
 
   try {
-    span.setAttribute('product.id', productId);
+    return await withSpan('get-product-by-id', async (span) => {
+      span.setAttribute('product.id', productId);
 
-    // Check cache
-    const cacheKey = `product:${productId}`;
-    const cached = getCached(cacheKey);
+      // Check cache
+      const cacheKey = `product:${productId}`;
+      const cached = await withRedis('GET', () => getCached(cacheKey));
 
-    if (cached) {
-      span.setAttribute('cache.hit', true);
-      productViewCounter.add(1, {
-        product_id: productId.toString(),
-        product_name: cached.product.name,
-        cache_hit: 'true'
-      });
-      span.end();
-      return res.json(cached);
-    }
+      if (cached) {
+        span.setAttribute('cache.hit', true);
+        productViewCounter.add(1, {
+          product_id: productId.toString(),
+          product_name: cached.product.name,
+          cache_hit: 'true'
+        });
+        return res.json(cached);
+      }
 
-    emitLog('INFO', 'Fetching product details', {
-      endpoint: '/api/products/:id',
-      product_id: productId
-    });
-
-    await simulateDbLatency('read');
-
-    const product = products.find(p => p.id === productId);
-
-    if (!product) {
-      span.setAttribute('product.found', false);
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
-
-      emitLog('WARNING', 'Product not found', {
+      emitLog('INFO', 'Fetching product details', {
+        endpoint: '/api/products/:id',
         product_id: productId
       });
 
-      span.end();
-      return res.status(404).json({ error: 'Product not found' });
-    }
+      await withPostgres('SELECT', 'products', () => {});
 
-    span.setAttribute('product.found', true);
-    span.setAttribute('product.name', product.name);
-    span.setAttribute('product.price', product.price);
-    span.setAttribute('product.category', product.category);
+      const product = products.find(p => p.id === productId);
 
-    productViewCounter.add(1, {
-      product_id: productId.toString(),
-      product_name: product.name,
+      if (!product) {
+        span.setAttribute('product.found', false);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
+
+        emitLog('WARNING', 'Product not found', {
+          product_id: productId
+        });
+
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      span.setAttribute('product.found', true);
+      span.setAttribute('product.name', product.name);
+      span.setAttribute('product.price', product.price);
+      span.setAttribute('product.category', product.category);
+
+      productViewCounter.add(1, {
+        product_id: productId.toString(),
+        product_name: product.name,
+      });
+
+      const response = { product };
+      await withRedis('SETEX', () => setCache(cacheKey, response));
+
+      emitLog('INFO', 'Product details retrieved', {
+        product_id: productId,
+        product_name: product.name,
+        price: product.price
+      });
+
+      res.json(response);
     });
-
-    const response = { product };
-    setCache(cacheKey, response);
-
-    emitLog('INFO', 'Product details retrieved', {
-      product_id: productId,
-      product_name: product.name,
-      price: product.price
-    });
-
-    span.end();
-    res.json(response);
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
-
     emitLog('ERROR', 'Error fetching product', {
       error: error.message,
       product_id: productId
     });
-
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get product reviews
 app.get('/api/products/:id/reviews', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-product-reviews');
   const productId = parseInt(req.params.id);
 
   try {
-    span.setAttribute('product.id', productId);
+    return await withSpan('get-product-reviews', async (span) => {
+      span.setAttribute('product.id', productId);
 
-    const product = products.find(p => p.id === productId);
-    if (!product) {
-      span.end();
-      return res.status(404).json({ error: 'Product not found' });
-    }
+      const product = products.find(p => p.id === productId);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
-    await simulateDbLatency('read');
+      await withMongo('reviews', 'find', () => {});
 
-    const reviews = productReviews.get(productId) || [];
+      const reviews = productReviews.get(productId) || [];
 
-    emitLog('INFO', 'Reviews retrieved', {
-      product_id: productId,
-      review_count: reviews.length
-    });
+      emitLog('INFO', 'Reviews retrieved', {
+        product_id: productId,
+        review_count: reviews.length
+      });
 
-    span.setAttribute('reviews.count', reviews.length);
-    span.end();
-
-    res.json({
-      productId,
-      productName: product.name,
-      averageRating: product.rating,
-      totalReviews: product.reviewCount,
-      reviews
+      span.setAttribute('reviews.count', reviews.length);
+      res.json({
+        productId,
+        productName: product.name,
+        averageRating: product.rating,
+        totalReviews: product.reviewCount,
+        reviews
+      });
     });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get product recommendations
 app.get('/api/products/:id/recommendations', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-recommendations');
   const productId = parseInt(req.params.id);
 
   try {
-    span.setAttribute('product.id', productId);
+    return await withSpan('get-recommendations', async (span) => {
+      span.setAttribute('product.id', productId);
 
-    const product = products.find(p => p.id === productId);
-    if (!product) {
-      span.end();
-      return res.status(404).json({ error: 'Product not found' });
-    }
+      const product = products.find(p => p.id === productId);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
-    emitLog('INFO', 'Generating recommendations', {
-      product_id: productId,
-      category: product.category
-    });
+      emitLog('INFO', 'Generating recommendations', {
+        product_id: productId,
+        category: product.category
+      });
 
-    // Simulate ML model latency
-    await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 70));
+      // Simulate ML model latency
+      await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 70));
 
-    // Get recommendations based on category and price range
-    const priceRange = product.price * 0.5;
-    const recommendations = products
-      .filter(p =>
-        p.id !== productId &&
-        (p.category === product.category ||
-          p.tags.some(t => product.tags.includes(t)))
-      )
-      .sort((a, b) => b.popularity - a.popularity)
-      .slice(0, 4);
+      // Get recommendations based on category and price range
+      const recommendations = products
+        .filter(p =>
+          p.id !== productId &&
+          (p.category === product.category ||
+            p.tags.some(t => product.tags.includes(t)))
+        )
+        .sort((a, b) => b.popularity - a.popularity)
+        .slice(0, 4);
 
-    recommendationsServedCounter.add(recommendations.length, {
-      source_product: productId.toString(),
-      algorithm: 'category_similarity'
-    });
+      recommendationsServedCounter.add(recommendations.length, {
+        source_product: productId.toString(),
+        algorithm: 'category_similarity'
+      });
 
-    span.setAttribute('recommendations.count', recommendations.length);
-    span.end();
-
-    res.json({
-      productId,
-      recommendations,
-      algorithm: 'category_similarity'
+      span.setAttribute('recommendations.count', recommendations.length);
+      res.json({
+        productId,
+        recommendations,
+        algorithm: 'category_similarity'
+      });
     });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Purchase a product
 app.post('/api/products/:id/purchase', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('purchase-product');
   const productId = parseInt(req.params.id);
   const quantity = req.body.quantity || 1;
   const startTime = Date.now();
 
   try {
-    span.setAttribute('product.id', productId);
-    span.setAttribute('purchase.quantity', quantity);
+    return await withSpan('purchase-product', async (span) => {
+      span.setAttribute('product.id', productId);
+      span.setAttribute('purchase.quantity', quantity);
 
-    // Add span event for purchase initiation
-    span.addEvent('purchase_initiated', {
-      product_id: productId,
-      quantity: quantity
-    });
-
-    emitLog('INFO', 'Processing purchase request', {
-      endpoint: '/api/products/:id/purchase',
-      product_id: productId,
-      quantity
-    });
-
-    checkoutAttemptCounter.add(1, {
-      product_id: productId.toString()
-    });
-
-    // Inventory check span
-    const inventorySpan = trace.getTracer('products-service').startSpan('check-inventory', {
-      parent: span,
-    });
-
-    await simulateDbLatency('read');
-
-    const product = products.find(p => p.id === productId);
-
-    if (!product) {
-      inventorySpan.end();
-      span.addEvent('purchase_failed', { reason: 'product_not_found' });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
-
-      cartAbandonmentCounter.add(1, {
-        reason: 'product_not_found'
+      // Add span event for purchase initiation
+      span.addEvent('purchase_initiated', {
+        product_id: productId,
+        quantity: quantity
       });
 
-      emitLog('WARNING', 'Purchase failed - product not found', {
-        product_id: productId
+      emitLog('INFO', 'Processing purchase request', {
+        endpoint: '/api/products/:id/purchase',
+        product_id: productId,
+        quantity
       });
 
-      span.end();
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    if (product.stock < quantity) {
-      inventorySpan.setAttribute('inventory.sufficient', false);
-      inventorySpan.end();
-      span.addEvent('purchase_failed', { reason: 'insufficient_stock' });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Insufficient stock' });
-
-      const lostRevenue = product.price * quantity;
-      cartAbandonmentCounter.add(1, {
-        reason: 'insufficient_stock',
+      checkoutAttemptCounter.add(1, {
         product_id: productId.toString()
       });
-      revenueAtRiskCounter.add(lostRevenue, {
-        reason: 'insufficient_stock',
-        product_name: product.name
+
+      // Inventory check span (nested + active)
+      const product = await withSpan('check-inventory', async (inventorySpan) => {
+        await withPostgres('SELECT', 'products', () => {});
+        const found = products.find(p => p.id === productId);
+        if (found) {
+          inventorySpan.setAttribute('inventory.sufficient', found.stock >= quantity);
+        }
+        return found;
       });
 
-      emitLog('WARNING', 'Purchase failed - insufficient stock', {
+      if (!product) {
+        span.addEvent('purchase_failed', { reason: 'product_not_found' });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
+
+        cartAbandonmentCounter.add(1, {
+          reason: 'product_not_found'
+        });
+
+        emitLog('WARNING', 'Purchase failed - product not found', {
+          product_id: productId
+        });
+
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      if (product.stock < quantity) {
+        span.addEvent('purchase_failed', { reason: 'insufficient_stock' });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Insufficient stock' });
+
+        const lostRevenue = product.price * quantity;
+        cartAbandonmentCounter.add(1, {
+          reason: 'insufficient_stock',
+          product_id: productId.toString()
+        });
+        revenueAtRiskCounter.add(lostRevenue, {
+          reason: 'insufficient_stock',
+          product_name: product.name
+        });
+
+        emitLog('WARNING', 'Purchase failed - insufficient stock', {
+          product_id: productId,
+          product_name: product.name,
+          requested: quantity,
+          available: product.stock,
+          lost_revenue: lostRevenue
+        });
+
+        return res.status(400).json({
+          error: 'Insufficient stock',
+          available: product.stock,
+          requested: quantity
+        });
+      }
+
+      // Payment processing span (nested + active)
+      const transactionAmount = product.price * quantity;
+      const paymentApproved = await withSpan('process-payment', async (paymentSpan) => {
+        paymentSpan.setAttribute('payment.amount', transactionAmount);
+        paymentSpan.setAttribute('payment.currency', 'USD');
+
+        // Simulate payment processing with variable latency
+        await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+
+        // Simulate payment failures (5% chance)
+        if (Math.random() < 0.05) {
+          paymentSpan.addEvent('payment_declined', { reason: 'card_declined' });
+          paymentSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Payment declined' });
+          return false;
+        }
+        paymentSpan.addEvent('payment_successful');
+        return true;
+      }, { 'payment.amount': transactionAmount, 'payment.currency': 'USD' });
+
+      if (!paymentApproved) {
+        span.addEvent('purchase_failed', { reason: 'payment_declined' });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Payment failed' });
+
+        cartAbandonmentCounter.add(1, {
+          reason: 'payment_declined',
+          product_id: productId.toString()
+        });
+        revenueAtRiskCounter.add(transactionAmount, {
+          reason: 'payment_declined',
+          product_name: product.name
+        });
+
+        emitLog('ERROR', 'Purchase failed - payment declined', {
+          product_id: productId,
+          amount: transactionAmount,
+          lost_revenue: transactionAmount
+        });
+
+        return res.status(402).json({ error: 'Payment declined' });
+      }
+
+      // Update inventory
+      product.stock -= quantity;
+
+      // Record successful purchase metrics
+      purchaseCounter.add(1, {
+        product_id: productId.toString(),
+        product_name: product.name,
+        category: product.category
+      });
+
+      checkoutSuccessCounter.add(1, {
+        product_id: productId.toString()
+      });
+
+      transactionValueHistogram.record(transactionAmount, {
+        product_id: productId.toString(),
+        product_name: product.name,
+        category: product.category
+      });
+
+      // Invalidate cache
+      productCache.delete(`product:${productId}`);
+
+      span.addEvent('purchase_completed', {
+        transaction_amount: transactionAmount,
+        remaining_stock: product.stock
+      });
+
+      emitLog('INFO', 'Purchase completed successfully', {
         product_id: productId,
         product_name: product.name,
-        requested: quantity,
-        available: product.stock,
-        lost_revenue: lostRevenue
+        quantity,
+        total_amount: transactionAmount,
+        remaining_stock: product.stock
       });
 
-      span.end();
-      return res.status(400).json({
-        error: 'Insufficient stock',
-        available: product.stock,
-        requested: quantity
+      const responseTime = Date.now() - startTime;
+      recentResponseTimes.push(responseTime);
+      if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
+
+      span.setAttribute('purchase.success', true);
+      span.setAttribute('purchase.total', transactionAmount);
+      span.setAttribute('response.time_ms', responseTime);
+
+      res.json({
+        success: true,
+        product: product.name,
+        quantity,
+        total: transactionAmount,
+        remaining_stock: product.stock,
+        orderId: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       });
-    }
-
-    inventorySpan.setAttribute('inventory.sufficient', true);
-    inventorySpan.end();
-
-    // Payment processing span
-    const paymentSpan = trace.getTracer('products-service').startSpan('process-payment', {
-      parent: span,
-    });
-    const transactionAmount = product.price * quantity;
-    paymentSpan.setAttribute('payment.amount', transactionAmount);
-    paymentSpan.setAttribute('payment.currency', 'USD');
-
-    // Simulate payment processing with variable latency
-    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-
-    // Simulate payment failures (5% chance)
-    if (Math.random() < 0.05) {
-      paymentSpan.addEvent('payment_declined', { reason: 'card_declined' });
-      paymentSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Payment declined' });
-      paymentSpan.end();
-      span.addEvent('purchase_failed', { reason: 'payment_declined' });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Payment failed' });
-
-      cartAbandonmentCounter.add(1, {
-        reason: 'payment_declined',
-        product_id: productId.toString()
-      });
-      revenueAtRiskCounter.add(transactionAmount, {
-        reason: 'payment_declined',
-        product_name: product.name
-      });
-
-      emitLog('ERROR', 'Purchase failed - payment declined', {
-        product_id: productId,
-        amount: transactionAmount,
-        lost_revenue: transactionAmount
-      });
-
-      span.end();
-      return res.status(402).json({ error: 'Payment declined' });
-    }
-
-    paymentSpan.addEvent('payment_successful');
-    paymentSpan.end();
-
-    // Update inventory
-    product.stock -= quantity;
-
-    // Record successful purchase metrics
-    purchaseCounter.add(1, {
-      product_id: productId.toString(),
-      product_name: product.name,
-      category: product.category
-    });
-
-    checkoutSuccessCounter.add(1, {
-      product_id: productId.toString()
-    });
-
-    transactionValueHistogram.record(transactionAmount, {
-      product_id: productId.toString(),
-      product_name: product.name,
-      category: product.category
-    });
-
-    // Invalidate cache
-    productCache.delete(`product:${productId}`);
-
-    span.addEvent('purchase_completed', {
-      transaction_amount: transactionAmount,
-      remaining_stock: product.stock
-    });
-
-    emitLog('INFO', 'Purchase completed successfully', {
-      product_id: productId,
-      product_name: product.name,
-      quantity,
-      total_amount: transactionAmount,
-      remaining_stock: product.stock
-    });
-
-    const responseTime = Date.now() - startTime;
-    recentResponseTimes.push(responseTime);
-    if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
-
-    span.setAttribute('purchase.success', true);
-    span.setAttribute('purchase.total', transactionAmount);
-    span.setAttribute('response.time_ms', responseTime);
-    span.end();
-
-    res.json({
-      success: true,
-      product: product.name,
-      quantity,
-      total: transactionAmount,
-      remaining_stock: product.stock,
-      orderId: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     });
   } catch (error) {
-    span.addEvent('purchase_error', { error: error.message });
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-
     cartAbandonmentCounter.add(1, {
       reason: 'system_error'
     });
@@ -1260,158 +1298,143 @@ app.post('/api/products/:id/purchase', async (req, res) => {
       product_id: productId
     });
 
-    span.end();
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get inventory for a product
 app.get('/api/inventory/:productId', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('check-inventory');
   const productId = parseInt(req.params.productId);
 
   try {
-    span.setAttribute('product.id', productId);
+    return await withSpan('check-inventory', async (span) => {
+      span.setAttribute('product.id', productId);
 
-    emitLog('INFO', 'Checking inventory', {
-      endpoint: '/api/inventory/:productId',
-      product_id: productId
-    });
+      emitLog('INFO', 'Checking inventory', {
+        endpoint: '/api/inventory/:productId',
+        product_id: productId
+      });
 
-    await simulateDbLatency('read');
+      await withPostgres('SELECT', 'products', () => {});
 
-    const product = products.find(p => p.id === productId);
+      const product = products.find(p => p.id === productId);
 
-    if (!product) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
-      emitLog('WARNING', 'Inventory check - product not found', { product_id: productId });
-      span.end();
-      return res.status(404).json({ error: 'Product not found' });
-    }
+      if (!product) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Product not found' });
+        emitLog('WARNING', 'Inventory check - product not found', { product_id: productId });
+        return res.status(404).json({ error: 'Product not found' });
+      }
 
-    // Determine stock status
-    let stockStatus = 'in_stock';
-    if (product.stock === 0) {
-      stockStatus = 'out_of_stock';
-    } else if (product.stock < 5) {
-      stockStatus = 'low_stock';
-    }
+      // Determine stock status
+      let stockStatus = 'in_stock';
+      if (product.stock === 0) {
+        stockStatus = 'out_of_stock';
+      } else if (product.stock < 5) {
+        stockStatus = 'low_stock';
+      }
 
-    emitLog('INFO', 'Inventory check complete', {
-      product_id: productId,
-      stock: product.stock,
-      status: stockStatus
-    });
+      emitLog('INFO', 'Inventory check complete', {
+        product_id: productId,
+        stock: product.stock,
+        status: stockStatus
+      });
 
-    span.setAttribute('inventory.stock', product.stock);
-    span.setAttribute('inventory.status', stockStatus);
-    span.end();
-
-    res.json({
-      product_id: productId,
-      product_name: product.name,
-      stock: product.stock,
-      available: product.stock > 0,
-      status: stockStatus,
-      reservable: product.stock
+      span.setAttribute('inventory.stock', product.stock);
+      span.setAttribute('inventory.status', stockStatus);
+      res.json({
+        product_id: productId,
+        product_name: product.name,
+        stock: product.stock,
+        available: product.stock > 0,
+        status: stockStatus,
+        reservable: product.stock
+      });
     });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
-
     emitLog('ERROR', 'Error checking inventory', {
       error: error.message,
       product_id: productId
     });
-
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get all categories
 app.get('/api/categories', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-categories');
-
   try {
-    emitLog('INFO', 'Fetching categories', {
-      endpoint: '/api/categories'
+    return await withSpan('get-categories', async () => {
+      emitLog('INFO', 'Fetching categories', {
+        endpoint: '/api/categories'
+      });
+
+      await withPostgres('SELECT', 'categories', () => {});
+
+      const categoryStats = {};
+      products.forEach(p => {
+        if (!categoryStats[p.category]) {
+          categoryStats[p.category] = { count: 0, avgPrice: 0, totalStock: 0 };
+        }
+        categoryStats[p.category].count++;
+        categoryStats[p.category].avgPrice += p.price;
+        categoryStats[p.category].totalStock += p.stock;
+      });
+
+      const categories = Object.entries(categoryStats).map(([name, stats]) => ({
+        name,
+        productCount: stats.count,
+        averagePrice: (stats.avgPrice / stats.count).toFixed(2),
+        totalStock: stats.totalStock
+      }));
+
+      emitLog('INFO', 'Categories retrieved', {
+        count: categories.length
+      });
+
+      res.json({ categories });
     });
-
-    await simulateDbLatency('read');
-
-    const categoryStats = {};
-    products.forEach(p => {
-      if (!categoryStats[p.category]) {
-        categoryStats[p.category] = { count: 0, avgPrice: 0, totalStock: 0 };
-      }
-      categoryStats[p.category].count++;
-      categoryStats[p.category].avgPrice += p.price;
-      categoryStats[p.category].totalStock += p.stock;
-    });
-
-    const categories = Object.entries(categoryStats).map(([name, stats]) => ({
-      name,
-      productCount: stats.count,
-      averagePrice: (stats.avgPrice / stats.count).toFixed(2),
-      totalStock: stats.totalStock
-    }));
-
-    emitLog('INFO', 'Categories retrieved', {
-      count: categories.length
-    });
-
-    span.end();
-    res.json({ categories });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
-
     emitLog('ERROR', 'Error fetching categories', {
       error: error.message
     });
-
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Service statistics endpoint
 app.get('/api/stats', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('get-stats');
-
   try {
-    const total = cacheHits + cacheMisses;
-    const cacheHitRate = total > 0 ? ((cacheHits / total) * 100).toFixed(2) : 0;
+    return await withSpan('get-stats', async () => {
+      const total = cacheHits + cacheMisses;
+      const cacheHitRate = total > 0 ? ((cacheHits / total) * 100).toFixed(2) : 0;
 
-    const stats = {
-      service: 'products-service',
-      version: '2.0.0',
-      uptime: process.uptime(),
-      products: {
-        total: products.length,
-        categories: [...new Set(products.map(p => p.category))].length,
-        totalStock: products.reduce((sum, p) => sum + p.stock, 0),
-        averagePrice: (products.reduce((sum, p) => sum + p.price, 0) / products.length).toFixed(2)
-      },
-      cache: {
-        hits: cacheHits,
-        misses: cacheMisses,
-        hitRate: `${cacheHitRate}%`,
-        size: productCache.size
-      },
-      circuitBreaker: {
-        state: circuitBreakerState === 0 ? 'closed' : circuitBreakerState === 1 ? 'half-open' : 'open',
-        consecutiveFailures
-      },
-      connections: {
-        active: activeConnections
-      }
-    };
+      const stats = {
+        service: 'products-service',
+        version: '2.0.0',
+        uptime: process.uptime(),
+        products: {
+          total: products.length,
+          categories: [...new Set(products.map(p => p.category))].length,
+          totalStock: products.reduce((sum, p) => sum + p.stock, 0),
+          averagePrice: (products.reduce((sum, p) => sum + p.price, 0) / products.length).toFixed(2)
+        },
+        cache: {
+          hits: cacheHits,
+          misses: cacheMisses,
+          hitRate: `${cacheHitRate}%`,
+          size: productCache.size
+        },
+        circuitBreaker: {
+          state: circuitBreakerState === 0 ? 'closed' : circuitBreakerState === 1 ? 'half-open' : 'open',
+          consecutiveFailures
+        },
+        connections: {
+          active: activeConnections
+        }
+      };
 
-    span.end();
-    res.json(stats);
+      res.json(stats);
+    });
   } catch (error) {
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-    span.end();
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1460,16 +1483,13 @@ app.get('/error', (req, res) => {
 
 // Slow endpoint for testing latency alerts
 app.get('/api/slow', async (req, res) => {
-  const span = trace.getTracer('products-service').startSpan('slow-endpoint');
-
   const delay = parseInt(req.query.delay) || 3000;
 
-  emitLog('INFO', 'Slow endpoint called', { delay });
-
-  await new Promise(resolve => setTimeout(resolve, delay));
-
-  span.setAttribute('artificial_delay_ms', delay);
-  span.end();
+  await withSpan('slow-endpoint', async (span) => {
+    emitLog('INFO', 'Slow endpoint called', { delay });
+    await new Promise(resolve => setTimeout(resolve, delay));
+    span.setAttribute('artificial_delay_ms', delay);
+  });
 
   res.json({
     message: 'Slow response completed',

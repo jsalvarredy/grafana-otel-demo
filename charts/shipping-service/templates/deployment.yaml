@@ -13,14 +13,21 @@ spec:
     metadata:
       labels:
         {{- include "shipping-service.selectorLabels" . | nindent 8 }}
+      {{- if .Values.beyla.enabled }}
       annotations:
         # Annotation to indicate Beyla auto-instrumentation
         instrumentation.beyla.io/enabled: "true"
+      {{- end }}
     spec:
+      {{- if .Values.beyla.enabled }}
       # Required for Beyla eBPF - share process namespace between containers
       shareProcessNamespace: true
+      {{- end }}
       containers:
-        # Main application container - Java Spring Boot WITHOUT OTEL SDK
+        # Main application container - Java Spring Boot.
+        # Auto-instrumented by the OpenTelemetry Java agent (no code changes)
+        # when instrumentation.javaAgent.enabled=true, or by the Beyla sidecar
+        # below when beyla.enabled=true.
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -28,8 +35,33 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-          {{- if .Values.env }}
+          {{- if or .Values.instrumentation.javaAgent.enabled .Values.env }}
           env:
+            {{- if .Values.instrumentation.javaAgent.enabled }}
+            # Enable the OpenTelemetry Java agent baked into the image. The JVM
+            # picks up JAVA_TOOL_OPTIONS automatically, so the app entrypoint is
+            # unchanged - still "zero code change" auto-instrumentation.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:{{ .Values.instrumentation.javaAgent.agentPath }}"
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            # Prometheus needs cumulative temporality (not delta).
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: "cumulative"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "otlp"
+            - name: OTEL_LOGS_EXPORTER
+              value: "otlp"
+            # Tag resource so it lines up with the rest of the demo.
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=demo,deployment.environment=demo"
+            {{- end }}
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
@@ -51,7 +83,7 @@ spec:
             periodSeconds: 5
 
         {{- if .Values.beyla.enabled }}
-        # Beyla sidecar - eBPF auto-instrumentation
+        # Beyla sidecar - eBPF auto-instrumentation (opt-in; needs BTF kernel)
         - name: beyla
           image: "{{ .Values.beyla.image.repository }}:{{ .Values.beyla.image.tag }}"
           securityContext:

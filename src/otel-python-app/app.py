@@ -492,6 +492,14 @@ def create_order():
                 known_users.add(user_id)
                 span.set_attribute('customer.type', 'new')
 
+            # Look up the user session (simulated Redis cache)
+            with tracer.start_as_current_span('redis GET session') as session_span:
+                session_span.set_attribute('db.system', 'redis')
+                session_span.set_attribute('db.operation', 'GET')
+                session_span.set_attribute('db.redis.key', f'session:{user_id}')
+                session_span.set_attribute('net.peer.name', 'redis')
+                time.sleep(0.001 + random.random() * 0.004)
+
             emit_log('INFO', 'Processing order creation',
                     endpoint='/api/orders',
                     product_id=product_id,
@@ -733,6 +741,14 @@ def create_order():
                         sla_violation_counter.add(1, {'reason': 'purchase_completion_failed'})
 
                     return jsonify({'error': 'Purchase completion failed'}), 503
+
+            # Persist the order to the relational store (simulated PostgreSQL write)
+            with tracer.start_as_current_span('postgresql INSERT orders') as db_write_span:
+                db_write_span.set_attribute('db.system', 'postgresql')
+                db_write_span.set_attribute('db.operation', 'INSERT')
+                db_write_span.set_attribute('db.sql.table', 'orders')
+                db_write_span.set_attribute('net.peer.name', 'postgres')
+                time.sleep(0.05 + random.random() * 0.08)
 
             # Create order record
             order_id = f'ORD-{order_id_counter:05d}'

@@ -3,6 +3,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
+# npm install honours the "overrides" block in package.json (npm >=8.3),
+# which pins p-limit to a CommonJS version so @pyroscope/nodejs can require it.
 RUN npm install --omit=dev
 
 COPY . .
