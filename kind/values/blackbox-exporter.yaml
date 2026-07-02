@@ -1,0 +1,33 @@
+# Blackbox exporter - synthetic / uptime monitoring.
+# ---------------------------------------------------------------------------
+# Probes the demo services from "outside" (black-box, like a synthetic check)
+# and reports up/down, latency and HTTP status as Prometheus metrics. This is
+# the open-source counterpart to Datadog/New Relic Synthetics. Prometheus
+# scrapes it via the `blackbox-http` job in values/prometheus.yaml.
+#
+# fullnameOverride pins the Service name so the scrape config can target a
+# predictable DNS name: blackbox-exporter.monitoring.svc.cluster.local:9115
+fullnameOverride: blackbox-exporter
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# Blackbox modules. http_2xx treats any 2xx response as success; a health
+# endpoint returning 503 (e.g. when a circuit breaker trips) is correctly
+# reported as a failed probe, which is exactly what we want for a synthetic
+# check during an incident.
+config:
+  modules:
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        method: GET
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        follow_redirects: true
+        preferred_ip_protocol: ip4

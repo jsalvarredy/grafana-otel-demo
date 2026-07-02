@@ -18,12 +18,18 @@ ingress:
 
 resources:
   limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
     cpu: 100m
     memory: 128Mi
-  requests:
-    cpu: 50m
-    memory: 64Mi
 
 env:
   # OTEL Collector endpoint
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  # Attach trace exemplars to histogram samples so Grafana can jump
+  # from a latency spike straight to the matching trace in Tempo.
+  OTEL_METRICS_EXEMPLAR_FILTER: "trace_based"
+  # Continuous profiling: push CPU/heap profiles to Pyroscope (flame graphs).
+  PYROSCOPE_SERVER_ADDRESS: "http://pyroscope.monitoring.svc.cluster.local:4040"
+  PYROSCOPE_APPLICATION_NAME: "products-service"

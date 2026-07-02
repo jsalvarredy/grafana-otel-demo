@@ -1,0 +1,32 @@
+# Pyroscope - continuous profiling backend (single binary for the demo).
+# Apps push CPU/heap profiles here via the Pyroscope SDK; Grafana renders them
+# as flame graphs. This is the open-source counterpart to Datadog Continuous
+# Profiler / New Relic profiling (paid add-ons there).
+
+pyroscope:
+  replicaCount: 1
+  # Pyroscope profiling its own runtime adds noise to the demo; keep it off.
+  disableSelfProfile: true
+  extraArgs:
+    log.level: info
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  persistence:
+    enabled: false
+
+# The Alloy agent (pull-based eBPF profiling) is not needed: our Node service
+# pushes profiles directly through the SDK. Disable it to keep the demo light.
+alloy:
+  enabled: false
+
+agent:
+  enabled: false
+
+# No external object storage; Pyroscope uses its local filesystem store.
+minio:
+  enabled: false

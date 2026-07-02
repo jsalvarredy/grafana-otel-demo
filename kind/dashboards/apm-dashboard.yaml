@@ -1,0 +1,1064 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apm-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: '1'
+data:
+  apm.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "enable": true,
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "hide": false,
+            "iconColor": "red",
+            "name": "Firing alerts",
+            "titleFormat": "{{alertname}}",
+            "useValueForTime": false
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "red",
+            "name": "Deploys & Incidents",
+            "target": {
+              "limit": 100,
+              "matchAny": true,
+              "tags": [
+                "deploy",
+                "incident"
+              ],
+              "type": "tags"
+            }
+          }
+        ]
+      },
+      "description": "New Relic-style APM for the demo services: Apdex, response time, throughput, error rate and a per-transaction breakdown \u2014 all from OpenTelemetry metrics in Prometheus. Pick a service with the Service variable.",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": true,
+          "keepTime": true,
+          "tags": [
+            "apm"
+          ],
+          "targetBlank": false,
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
+        }
+      ],
+      "liveNow": false,
+      "panels": [
+        {
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "transparent": true,
+          "type": "text",
+          "options": {
+            "mode": "html",
+            "code": {
+              "language": "html",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "<div style=\"display:flex;align-items:center;gap:18px;padding:8px 4px\">\n  <div style=\"width:10px;height:46px;background:linear-gradient(180deg,#F46800,#8F3BB8);border-radius:3px\"></div>\n  <div>\n    <div style=\"font-size:26px;font-weight:800;color:#fff\">APM &mdash; Application Performance</div>\n    <div style=\"font-size:13px;color:#9aa0a6;margin-top:2px\">Apdex &middot; Response time &middot; Throughput &middot; Error rate &mdash; per service, the New Relic way, on open source. Pick a <b>Service</b> above.</div>\n  </div>\n  <div style=\"margin-left:auto;text-align:right;font-size:12px;color:#9aa0a6\">Apdex target T = 250ms<br/>OpenTelemetry &rarr; Prometheus</div>\n</div>"
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 3
+          },
+          "id": 2,
+          "panels": [],
+          "title": "Service health \u2014 New Relic-style summary",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Apdex_T = (satisfied + tolerating/2) / total, with T=250ms. >=0.94 great, 0.85-0.94 ok, <0.5 poor.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.5
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.85
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.94
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 0,
+            "y": 4
+          },
+          "id": 10,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum(service:apdex_satisfied:rate5m{service_name=~\"$service\"}) + sum(service:apdex_tolerating:rate5m{service_name=~\"$service\"})) / (2 * sum(service:apdex_total:rate5m{service_name=~\"$service\"}))",
+              "refId": "A"
+            }
+          ],
+          "title": "Apdex (T=250ms)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Mean server-side response time across the selected service(s).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 1,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 250
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 6,
+            "y": 4
+          },
+          "id": 11,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) * 1000 or vector(0))) / clamp_min((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1)",
+              "refId": "A"
+            }
+          ],
+          "title": "Avg response time",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Requests per minute (New Relic-style). Server-side request rate x 60.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 0,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 4
+          },
+          "id": 12,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0))) * 60",
+              "refId": "A"
+            }
+          ],
+          "title": "Throughput (rpm)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Share of 5xx responses over total, both metric families.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 18,
+            "y": 4
+          },
+          "id": 13,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1) * 100",
+              "refId": "A"
+            }
+          ],
+          "title": "Error rate",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 9
+          },
+          "id": 3,
+          "panels": [],
+          "title": "Response time & Apdex",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Average and percentiles (p50/p95/p99) of response time. New Relic's headline 'web transactions time' chart.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "unit": "ms",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 16,
+            "x": 0,
+            "y": 9
+          },
+          "id": 20,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) * 1000 or vector(0))) / clamp_min((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1)",
+              "refId": "A",
+              "legendFormat": "avg"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.5, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.5, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "refId": "B",
+              "legendFormat": "p50"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "refId": "C",
+              "legendFormat": "p95"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "refId": "D",
+              "legendFormat": "p99"
+            }
+          ],
+          "title": "Web transaction response time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Apdex score trend. Lines mark the 0.85 (ok) and 0.94 (great) bands.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false,
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "unit": "none",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.85
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.94
+                  }
+                ]
+              },
+              "decimals": 2,
+              "max": 1,
+              "min": 0
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 8,
+            "x": 16,
+            "y": 9
+          },
+          "id": 21,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum(service:apdex_satisfied:rate5m{service_name=~\"$service\"}) + sum(service:apdex_tolerating:rate5m{service_name=~\"$service\"})) / (2 * sum(service:apdex_total:rate5m{service_name=~\"$service\"}))",
+              "refId": "A",
+              "legendFormat": "Apdex"
+            }
+          ],
+          "title": "Apdex over time",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 17
+          },
+          "id": 4,
+          "panels": [],
+          "title": "Throughput & errors",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Per-transaction request rate (stacked).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 30,
+                "gradientMode": "opacity",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "reqps",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 18
+          },
+          "id": 30,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m]))",
+              "refId": "A",
+              "legendFormat": "{{endpoint}}"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
+              "refId": "B",
+              "legendFormat": "{{http_route}}"
+            }
+          ],
+          "title": "Throughput by transaction",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "5xx error rate. Line marks the 5% alert threshold.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false,
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "unit": "percent",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 18
+          },
+          "id": 31,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1) * 100",
+              "refId": "A",
+              "legendFormat": "error rate"
+            }
+          ],
+          "title": "Error rate over time",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+          },
+          "id": 5,
+          "panels": [],
+          "title": "Transactions",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Per-transaction breakdown. 'Time consumed' = rate of the response-time sum (throughput x avg) \u2014 the same ranking New Relic uses for 'most time consuming transactions'. Apdex is computed per transaction (T=250ms).",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Apdex"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "none"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 0.5
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 0.85
+                        },
+                        {
+                          "color": "green",
+                          "value": 0.94
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Throughput (rpm)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Avg resp (ms)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time consumed (ms/s)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "id": 40,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Time consumed (ms/s)"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) * 60",
+              "refId": "A",
+              "instant": true,
+              "format": "table",
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m]) * 1000), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) / clamp_min(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")), 0.0001)",
+              "refId": "B",
+              "instant": true,
+              "format": "table",
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_bucket{le=~`250(\\.0+)?`,service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=\"0.25\",service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")) + sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_bucket{le=~`1000(\\.0+)?`,service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=\"1.0\",service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) / (2 * sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")))",
+              "refId": "C",
+              "instant": true,
+              "format": "table",
+              "range": false
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m]) * 1000), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))",
+              "refId": "D",
+              "instant": true,
+              "format": "table",
+              "range": false
+            }
+          ],
+          "title": "Transactions \u2014 most time consuming",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {
+                  "transaction": 0,
+                  "Value #A": 1,
+                  "Value #B": 2,
+                  "Value #C": 3,
+                  "Value #D": 4
+                },
+                "renameByName": {
+                  "transaction": "Transaction",
+                  "Value #A": "Throughput (rpm)",
+                  "Value #B": "Avg resp (ms)",
+                  "Value #C": "Apdex",
+                  "Value #D": "Time consumed (ms/s)"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": [
+        "apm",
+        "otel",
+        "apdex"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "definition": "label_values({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}, service_name)",
+            "query": {
+              "query": "label_values({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}, service_name)",
+              "refId": "service"
+            },
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "current": {
+              "selected": true,
+              "text": [
+                "All"
+              ],
+              "value": [
+                "$__all"
+              ]
+            },
+            "refresh": 2,
+            "sort": 1
+          }
+        ]
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "1h"
+        ],
+        "time_options": [
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "3h",
+          "6h",
+          "12h",
+          "24h"
+        ]
+      },
+      "timezone": "",
+      "title": "APM",
+      "uid": "apm-overview",
+      "version": 1,
+      "weekStart": ""
+    }

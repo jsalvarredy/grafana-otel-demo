@@ -18,6 +18,11 @@
     "@opentelemetry/sdk-metrics": "^1.18.0",
     "@opentelemetry/sdk-logs": "^0.45.0",
     "@opentelemetry/semantic-conventions": "^1.18.0",
+    "@pyroscope/nodejs": "^0.4.13",
     "express": "^4.18.2"
+  },
+  "comment": "p-limit is pinned to 3.x (the last CommonJS release) via overrides: @pyroscope/nodejs is CJS and require()s p-limit, but p-limit >=4 is ESM-only, which breaks under require() on Node 18 (ERR_REQUIRE_ESM).",
+  "overrides": {
+    "p-limit": "3.1.0"
   }
 }

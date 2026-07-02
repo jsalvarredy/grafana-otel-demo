@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "frontend-app.fullname" . }}
+  labels:
+    {{- include "frontend-app.labels" . | nindent 4 }}
+data:
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Faro Shop — Grafana RUM demo</title>
+    <style>
+      body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;background:#0b0c0e;color:#e8e8e8}
+      h1{color:#F5A623}
+      button{background:#F5A623;border:0;color:#1a1a1a;padding:10px 14px;margin:4px;border-radius:6px;cursor:pointer;font-weight:600}
+      button.alt{background:#3b82f6;color:#fff}
+      button.err{background:#e5484d;color:#fff}
+      pre{background:#1a1b1e;border:1px solid #2a2b2e;border-radius:6px;padding:12px;white-space:pre-wrap;min-height:90px}
+      .card{background:#1a1b1e;border:1px solid #2a2b2e;border-radius:6px;padding:10px;margin:6px 0}
+      .muted{color:#8e8e8e;font-size:13px}
+    </style>
+    <script>
+      // --- Config injected by Helm (isolated to these three simple lines) ---
+      window.FARO_URL = '{{ .Values.faro.collectorUrl }}';
+      window.FARO_APP = '{{ .Values.faro.appName }}';
+      window.FARO_ENV = '{{ .Values.faro.appEnv }}';
+    </script>
+    <script>
+      function logLine(msg){ document.getElementById('log').textContent += msg + '\n'; }
+      // Initialize Faro ONCE, passing BOTH the default web instrumentations AND
+      // OpenTelemetry web tracing up-front (the canonical, reliable way). Adding
+      // TracingInstrumentation AFTER initializeFaro did NOT wire the browser's
+      // fetch tracing, so no browser spans / traceparent reached the backend.
+      // Runs after both IIFE bundles have loaded (see scripts at the end).
+      window.startFaro = function(){
+        if (window.__faroStarted) return; window.__faroStarted = true;
+        var Sdk = window.GrafanaFaroWebSdk, T = window.GrafanaFaroWebTracing;
+        var base = {
+          url: window.FARO_URL,
+          app: { name: window.FARO_APP, version: '1.0.0', environment: window.FARO_ENV },
+          sessionTracking: { enabled: true }
+        };
+        var faro = null;
+        // Preferred: default web instrumentations (RUM) + tracing, up-front.
+        try {
+          if (typeof Sdk.getWebInstrumentations === 'function') {
+            var instr = Sdk.getWebInstrumentations();
+            if (T && T.TracingInstrumentation) { instr.push(new T.TracingInstrumentation()); }
+            faro = Sdk.initializeFaro(Object.assign({}, base, { instrumentations: instr }));
+          }
+        } catch (e) { faro = null; }
+        // Fallback: default init (the known-good RUM path), then add tracing.
+        if (!faro) {
+          faro = Sdk.initializeFaro(base);
+          try {
+            if (T && T.TracingInstrumentation && faro && faro.instrumentations) {
+              faro.instrumentations.add(new T.TracingInstrumentation());
+            }
+          } catch (e) {}
+        }
+        try { logLine('Faro initialized (RUM + browser->backend tracing).'); } catch (e) {}
+      };
+      async function loadProducts(){
+        logLine('GET /api/products ...');
+        try{
+          var r = await fetch('/api/products');
+          var data = await r.json();
+          var list = data.products || data || [];
+          logLine('products loaded: ' + (list.length || 0));
+        }catch(e){ logLine('error: ' + e.message); }
+      }
+      async function placeOrder(){
+        logLine('POST /api/orders ...');
+        try{
+          // Pick a product that is actually in stock (like a real shop would),
+          // otherwise the orders service correctly rejects it with HTTP 400
+          // ("Insufficient stock"). The hard-coded product #1 is out of stock.
+          var pr = await fetch('/api/products');
+          var pdata = await pr.json();
+          var inStock = (pdata.products || pdata || []).filter(function(p){ return (p.stock || 0) > 0; });
+          if (!inStock.length){ logLine('no products in stock right now'); return; }
+          var pick = inStock[Math.floor(Math.random() * inStock.length)];
+          var r = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_id: pick.id, quantity: 1, user_id: 'faro-shopper' })
+          });
+          logLine('order "' + pick.name + '" (#' + pick.id + ') -> HTTP ' + r.status);
+        }catch(e){ logLine('error: ' + e.message); }
+      }
+      function triggerError(){
+        logLine('throwing a demo JS error (captured by Faro)...');
+        throw new Error('Demo frontend error from Faro Shop');
+      }
+    </script>
+    </head>
+    <body>
+      <h1>Faro Shop</h1>
+      <p class="muted">A tiny instrumented frontend. Grafana Faro captures Core Web Vitals, JS errors and user sessions; the OpenTelemetry web tracing links each click to a full-stack trace (browser &rarr; orders &rarr; products).</p>
+      <div class="card">
+        <button onclick="loadProducts()">Load products</button>
+        <button class="alt" onclick="placeOrder()">Place order</button>
+        <button class="err" onclick="triggerError()">Trigger JS error</button>
+      </div>
+      <pre id="log"></pre>
+      <p class="muted">Open the <strong>Frontend / RUM</strong> dashboard in Grafana to see the data flow in.</p>
+      <!-- Faro bundles vendored same-origin (pinned 1.19.0, baked into the image at /vendor). No CDN egress from the browser. -->
+      <!-- Loaded synchronously and in order; startFaro() runs once BOTH are ready. -->
+      <script src="/vendor/faro-web-sdk.iife.js"></script>
+      <script src="/vendor/faro-web-tracing.iife.js"></script>
+      <script>window.startFaro();</script>
+    </body>
+    </html>
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location = /healthz {
+        return 200 'ok';
+        add_header Content-Type text/plain;
+      }
+
+      # Same-origin reverse proxy: because the browser calls /api/* on the SAME
+      # host that served the page, the OpenTelemetry web tracing propagates the
+      # traceparent header to the backend with no CORS. nginx forwards request
+      # headers (incl. traceparent) to the upstream by default.
+      location /api/products {
+        proxy_pass {{ .Values.backends.products }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+      }
+      location /api/orders {
+        proxy_pass {{ .Values.backends.orders }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+      }
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+    }

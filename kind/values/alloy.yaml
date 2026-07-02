@@ -1,0 +1,291 @@
+# Grafana Alloy - unified telemetry gateway (Deployment).
+# ---------------------------------------------------------------------------
+# FASE 2 of the Alloy consolidation. This release now does TWO jobs in one
+# process (it absorbed the former `otel-collector` Deployment):
+#
+#   1. faro.receiver - Real User Monitoring from the browser (unchanged from
+#      Fase 0/Sprint 2): logs/events/exceptions/web-vitals -> Loki, browser
+#      OpenTelemetry traces -> Tempo.
+#
+#   2. OTLP backend gateway - receives OTLP (grpc :4317 / http :4318) from
+#      products-service, orders-service and shipping-service (Java agent),
+#      exactly like the retired `otel-collector` did:
+#        traces:  memory_limiter -> k8sattributes -> tail_sampling -> batch -> Tempo
+#        metrics: memory_limiter -> k8sattributes -> batch -> Prometheus (remote_write, WITH exemplars)
+#        logs:    memory_limiter -> k8sattributes -> batch -> Loki
+#
+# Why a Deployment (not the chart's default DaemonSet): tail_sampling makes
+# its keep/drop decision by holding ALL spans of a trace in ONE process
+# memory; every service must send to the SAME instance. A single-replica
+# Deployment guarantees that (a DaemonSet would split traffic by node and
+# break sampling decisions on multi-node clusters).
+#
+# EXEMPLARS, migrated: the old collector's `prometheus` exporter needed
+# `enable_open_metrics: true` so exemplars would travel over the OpenMetrics
+# scrape format. Alloy's `otelcol.exporter.prometheus` is a different kind of
+# component - it converts OTLP metrics into Alloy's native Prometheus model
+# and forwards them to `prometheus.remote_write`, where exemplars are carried
+# natively (no OpenMetrics text exposition needed). We push straight to
+# Prometheus's remote-write receiver (already enabled for Tempo's span
+# metrics), so exemplars keep working end to end.
+#
+# alloy-logs (Fase 1, DaemonSet tailing pod stdout) is UNTOUCHED by this file.
+
+controller:
+  type: deployment
+  replicas: 1
+
+alloy:
+  extraPorts:
+    - name: faro
+      port: 12347
+      targetPort: 12347
+      protocol: TCP
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+  configMap:
+    content: |-
+      // =======================================================================
+      // 1) FARO RECEIVER - frontend RUM (unchanged behavior from Sprint 2)
+      // =======================================================================
+      faro.receiver "default" {
+        server {
+          listen_address       = "0.0.0.0"
+          listen_port          = 12347
+          cors_allowed_origins = ["*"]
+        }
+
+        extra_log_labels = {
+          source = "faro",
+          app    = "frontend-shop",
+        }
+
+        output {
+          logs   = [loki.write.default.receiver]
+          traces = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      // =======================================================================
+      // 2) OTLP BACKEND GATEWAY - products/orders/shipping -> Tempo/Prometheus/Loki
+      // =======================================================================
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+
+        output {
+          traces  = [otelcol.processor.memory_limiter.default.input]
+          metrics = [otelcol.processor.memory_limiter.default.input]
+          logs    = [otelcol.processor.memory_limiter.default.input]
+        }
+      }
+
+      // Memory limiter prevents OOM under load (must be first in the pipeline).
+      otelcol.processor.memory_limiter "default" {
+        check_interval  = "5s"
+        limit           = "400MiB"
+        spike_limit     = "100MiB"
+
+        output {
+          traces  = [otelcol.processor.k8sattributes.default.input]
+          metrics = [otelcol.processor.k8sattributes.default.input]
+          logs    = [otelcol.processor.k8sattributes.default.input]
+        }
+      }
+
+      // Enrich telemetry with Kubernetes metadata (same fields as the retired
+      // otel-collector's k8sattributes processor).
+      otelcol.processor.k8sattributes "default" {
+        auth_type    = "serviceAccount"
+        passthrough  = false
+
+        extract {
+          metadata = [
+            "k8s.pod.name",
+            "k8s.pod.uid",
+            "k8s.deployment.name",
+            "k8s.namespace.name",
+            "k8s.node.name",
+            "k8s.pod.start_time",
+          ]
+        }
+
+        // Pod association using IP (Alloy runs as a Deployment, like the
+        // collector did) with UID and connection-peer fallbacks.
+        pod_association {
+          source {
+            from = "resource_attribute"
+            name = "k8s.pod.ip"
+          }
+        }
+        pod_association {
+          source {
+            from = "resource_attribute"
+            name = "k8s.pod.uid"
+          }
+        }
+        pod_association {
+          source {
+            from = "connection"
+          }
+        }
+
+        output {
+          traces  = [otelcol.processor.tail_sampling.default.input]
+          metrics = [otelcol.processor.batch.metrics.input]
+          logs    = [otelcol.processor.batch.logs.input]
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // Tail sampling: keep what matters, drop the boring bulk. Same policy set
+      // as the retired otel-collector: 100% errors, 100% slow (>=500ms), and
+      // (in this low-volume demo) 100% of everything else too, so every log
+      // line can always pivot to its trace. Span metrics and the service graph
+      // are produced by Tempo's metrics generator from ALL ingested spans, so
+      // RED metrics and the Service Map stay accurate regardless of sampling.
+      // -----------------------------------------------------------------------
+      otelcol.processor.tail_sampling "default" {
+        decision_wait                = "10s"
+        num_traces                   = 50000
+        expected_new_traces_per_sec  = 200
+
+        policy {
+          name = "errors"
+          type = "status_code"
+
+          status_code {
+            status_codes = ["ERROR"]
+          }
+        }
+
+        policy {
+          name = "slow"
+          type = "latency"
+
+          latency {
+            threshold_ms = 500
+          }
+        }
+
+        // Keep the rest too (100% in this demo; lower this in production for
+        // cost control - errors/slow stay at 100% regardless).
+        policy {
+          name = "sample-the-rest"
+          type = "probabilistic"
+
+          probabilistic {
+            sampling_percentage = 100
+          }
+        }
+
+        output {
+          traces = [otelcol.processor.batch.traces.input]
+        }
+      }
+
+      otelcol.processor.batch "traces" {
+        send_batch_size     = 1024
+        send_batch_max_size = 2048
+        timeout              = "5s"
+
+        output {
+          traces = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      otelcol.processor.batch "metrics" {
+        send_batch_size     = 1024
+        send_batch_max_size = 2048
+        timeout              = "5s"
+
+        output {
+          metrics = [otelcol.exporter.prometheus.default.input]
+        }
+      }
+
+      otelcol.processor.batch "logs" {
+        send_batch_size     = 1024
+        send_batch_max_size = 2048
+        timeout              = "5s"
+
+        output {
+          logs = [otelcol.exporter.otlphttp.loki.input]
+        }
+      }
+
+      // TRACES -> TEMPO (also the destination for Faro browser traces above).
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "tempo.monitoring.svc.cluster.local:4317"
+          tls {
+            insecure = true
+          }
+        }
+      }
+
+      // METRICS -> PROMETHEUS. otelcol.exporter.prometheus converts OTLP
+      // metrics to Alloy's native Prometheus model (exemplars travel with the
+      // samples natively) and prometheus.remote_write pushes them straight to
+      // Prometheus's remote-write receiver - no scrape/OpenMetrics step needed.
+      otelcol.exporter.prometheus "default" {
+        resource_to_telemetry_conversion = true
+        forward_to = [prometheus.remote_write.default.receiver]
+      }
+
+      prometheus.remote_write "default" {
+        endpoint {
+          url = "http://prometheus-server.monitoring.svc.cluster.local/api/v1/write"
+          send_exemplars = true
+        }
+      }
+
+      // LOGS -> LOKI (via the gateway's OTLP endpoint, same as the old collector).
+      otelcol.exporter.otlphttp "loki" {
+        client {
+          endpoint = "http://loki-gateway.monitoring.svc.cluster.local/otlp"
+          tls {
+            insecure = true
+          }
+        }
+      }
+
+      // Frontend logs, events, exceptions and measurements (Web Vitals) from
+      // Faro -> Loki (unchanged from Sprint 2).
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+# Built-in ingress for the Faro receiver port (12347). The browser SDK targets
+# http://faro.127.0.0.1.nip.io/collect.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  path: /
+  pathType: Prefix
+  faroPort: 12347
+  hosts:
+    - faro.127.0.0.1.nip.io

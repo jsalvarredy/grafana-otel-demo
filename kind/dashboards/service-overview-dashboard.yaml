@@ -4,7 +4,7 @@ metadata:
   name: service-overview-dashboard
   namespace: monitoring
   labels:
-    grafana_dashboard: "1"
+    grafana_dashboard: '1'
 data:
   service-overview.json: |
     {
@@ -12,12 +12,34 @@ data:
         "list": [
           {
             "builtIn": 1,
-            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
             "enable": true,
             "hide": true,
             "iconColor": "rgba(0, 211, 255, 1)",
             "name": "Annotations & Alerts",
             "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "red",
+            "name": "Deploys & Incidents",
+            "target": {
+              "limit": 100,
+              "matchAny": true,
+              "tags": [
+                "deploy",
+                "incident"
+              ],
+              "type": "tags"
+            }
           }
         ]
       },
@@ -30,49 +52,86 @@ data:
         {
           "asDropdown": true,
           "icon": "external link",
-          "includeVars": false,
+          "includeVars": true,
           "keepTime": true,
-          "tags": [],
+          "tags": [
+            "apm"
+          ],
           "targetBlank": false,
-          "title": "Navigate",
-          "type": "dashboards"
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
         }
       ],
       "liveNow": false,
       "panels": [
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
           "id": 1,
           "panels": [],
           "title": "Service Health Summary",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "fixedColor": "#37872D", "mode": "fixed" },
+              "color": {
+                "fixedColor": "#37872D",
+                "mode": "fixed"
+              },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
               "unit": "reqps"
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 1
+          },
           "id": 10,
           "options": {
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
             "textMode": "value_and_name"
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(rate(http_requests_total[5m])) + sum(rate(http_server_request_duration_seconds_count[5m]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0))",
               "legendFormat": "Total Throughput",
               "refId": "A"
             }
@@ -81,31 +140,66 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "thresholds" },
+              "color": {
+                "mode": "thresholds"
+              },
               "decimals": 2,
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 1 }, { "color": "red", "value": 5 } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
               "unit": "percent"
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 1
+          },
           "id": 11,
           "options": {
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
             "textMode": "value_and_name"
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) or vector(0))) / ((sum(rate(http_requests_total[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0))) * 100",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "((sum(rate(http_requests_total{service_name=~\"$service\",http_status_code=~\"5..\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_response_status_code=~\"5..\"}[5m])) or vector(0))) / ((sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0))) * 100",
               "legendFormat": "Error Rate",
               "refId": "A"
             }
@@ -114,37 +208,75 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "thresholds" },
+              "color": {
+                "mode": "thresholds"
+              },
               "decimals": 0,
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 200 }, { "color": "red", "value": 500 } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 200
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              },
               "unit": "ms"
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 1
+          },
           "id": 12,
           "options": {
             "colorMode": "background",
             "graphMode": "area",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
             "textMode": "value_and_name"
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "legendFormat": "P95 SDK",
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(histogram_quantile(0.95, (sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le) or vector(0))) * 1000) or (histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "legendFormat": "P95 Beyla",
               "refId": "B"
             }
@@ -153,30 +285,58 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "fixedColor": "#8F3BB8", "mode": "fixed" },
+              "color": {
+                "fixedColor": "#8F3BB8",
+                "mode": "fixed"
+              },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "#8F3BB8", "value": null } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#8F3BB8",
+                    "value": null
+                  }
+                ]
+              },
               "unit": "short"
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 1
+          },
           "id": 13,
           "options": {
             "colorMode": "background",
             "graphMode": "none",
             "justifyMode": "auto",
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
             "textMode": "value_and_name"
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "count(count by (service_name) (http_requests_total) or count by (service_name) (http_server_request_duration_seconds_count))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(count(count by (service_name) (http_requests_total{service_name=~\"$service\"}) or count by (service_name) (http_server_request_duration_seconds_count{service_name=~\"$service\"})) or vector(0))",
               "legendFormat": "Active Services",
               "refId": "A"
             }
@@ -186,17 +346,27 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          },
           "id": 20,
           "panels": [],
           "title": "RED Metrics - Rate / Errors / Duration",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic" },
+              "color": {
+                "mode": "palette-classic"
+              },
               "custom": {
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
@@ -206,38 +376,80 @@ data:
                 "drawStyle": "line",
                 "fillOpacity": 25,
                 "gradientMode": "opacity",
-                "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
                 "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
                 "showPoints": "never",
                 "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
               "unit": "reqps"
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 6
+          },
           "id": 2,
           "options": {
-            "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (service_name) (rate(http_requests_total{service_name=~\"$service\"}[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "B"
             }
@@ -246,34 +458,72 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "thresholds" },
+              "color": {
+                "mode": "thresholds"
+              },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 0.01 }, { "color": "red", "value": 0.05 } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 0.01
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.05
+                  }
+                ]
+              },
               "unit": "percentunit"
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 6
+          },
           "id": 3,
           "options": {
             "orientation": "auto",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
             "showThresholdLabels": false,
             "showThresholdMarkers": true
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_requests_total[5m]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum by (service_name) (rate(http_requests_total{service_name=~\"$service\",http_status_code=~\"5..\"}[5m])) or (sum by (service_name) (rate(http_requests_total[5m])) * 0)) / sum by (service_name) (rate(http_requests_total{service_name=~\"$service\"}[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(sum by (service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_response_status_code=~\"5..\"}[5m])) or (sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])) * 0)) / sum by (service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
               "legendFormat": "{{service_name}}",
               "refId": "B"
             }
@@ -282,11 +532,16 @@ data:
           "type": "gauge"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "description": "Response time percentiles: P50 (median), P95, and P99. SDK services report in milliseconds, Beyla services report in seconds (converted to ms).",
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic" },
+              "color": {
+                "mode": "palette-classic"
+              },
               "custom": {
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
@@ -296,70 +551,143 @@ data:
                 "drawStyle": "line",
                 "fillOpacity": 10,
                 "gradientMode": "scheme",
-                "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
                 "lineInterpolation": "smooth",
                 "lineWidth": 2,
                 "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
+                "scaleDistribution": {
+                  "type": "linear"
+                },
                 "showPoints": "never",
                 "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "dashed" }
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "dashed"
+                }
               },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 500 } ] },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              },
               "unit": "ms"
             },
             "overrides": [
               {
-                "matcher": { "id": "byRegexp", "options": "^p99.*" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "^p99.*"
+                },
                 "properties": [
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
-                  { "id": "custom.fillOpacity", "value": 0 }
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.fillOpacity",
+                    "value": 0
+                  }
                 ]
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 14
+          },
           "id": 4,
           "options": {
-            "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
-            "tooltip": { "mode": "multi", "sort": "desc" }
+            "legend": {
+              "calcs": [
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.50, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.50, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name))",
               "legendFormat": "p50 - {{service_name}}",
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) * 1000",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(histogram_quantile(0.50, (sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name) or vector(0))) * 1000) or (histogram_quantile(0.5, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "legendFormat": "p50 - {{service_name}}",
               "refId": "B"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name))",
               "legendFormat": "p95 - {{service_name}}",
               "refId": "C"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) * 1000",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(histogram_quantile(0.95, (sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name) or vector(0))) * 1000) or (histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "legendFormat": "p95 - {{service_name}}",
               "refId": "D"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name))",
               "legendFormat": "p99 - {{service_name}}",
               "refId": "E"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) * 1000",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(histogram_quantile(0.99, (sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name) or vector(0))) * 1000) or (histogram_quantile(0.99, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "legendFormat": "p99 - {{service_name}}",
               "refId": "F"
             }
@@ -369,26 +697,49 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 22
+          },
           "id": 30,
           "panels": [],
           "title": "Latency Heatmap",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "description": "Latency distribution heatmap showing request density across response time buckets (SDK services in milliseconds)",
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "scheme", "exponent": 0.5 },
+              "color": {
+                "mode": "scheme",
+                "exponent": 0.5
+              },
               "custom": {
-                "hideFrom": { "tooltip": false, "viz": false, "legend": false },
-                "scaleDistribution": { "log": 2, "type": "log" }
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "scaleDistribution": {
+                  "log": 2,
+                  "type": "log"
+                }
               }
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 23
+          },
           "id": 31,
           "options": {
             "calculate": false,
@@ -403,18 +754,36 @@ data:
               "scheme": "Turbo",
               "steps": 128
             },
-            "exemplars": { "color": "rgba(255,0,255,0.7)" },
-            "filterValues": { "le": 1e-9 },
-            "legend": { "show": true },
-            "rowsFrame": { "layout": "auto" },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-09
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
             "showValue": "never",
-            "tooltip": { "show": true, "yHistogram": false },
-            "yAxis": { "axisPlacement": "left", "reverse": false, "unit": "ms" }
+            "tooltip": {
+              "show": true,
+              "yHistogram": false
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "reverse": false,
+              "unit": "ms"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(increase(http_server_duration_milliseconds_bucket[5m])) by (le)",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(increase(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)",
               "format": "heatmap",
               "legendFormat": "{{le}}",
               "refId": "A"
@@ -424,19 +793,38 @@ data:
           "type": "heatmap"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "description": "Latency distribution heatmap showing request density across response time buckets (Beyla eBPF services in seconds)",
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "scheme", "exponent": 0.5 },
+              "color": {
+                "mode": "scheme",
+                "exponent": 0.5
+              },
               "custom": {
-                "hideFrom": { "tooltip": false, "viz": false, "legend": false },
-                "scaleDistribution": { "log": 2, "type": "log" }
-              }
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "scaleDistribution": {
+                  "log": 2,
+                  "type": "log"
+                }
+              },
+              "unit": "ms"
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 23
+          },
           "id": 32,
           "options": {
             "calculate": false,
@@ -451,62 +839,123 @@ data:
               "scheme": "Magma",
               "steps": 128
             },
-            "exemplars": { "color": "rgba(255,0,255,0.7)" },
-            "filterValues": { "le": 1e-9 },
-            "legend": { "show": true },
-            "rowsFrame": { "layout": "auto" },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-09
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
             "showValue": "never",
-            "tooltip": { "show": true, "yHistogram": false },
-            "yAxis": { "axisPlacement": "left", "reverse": false, "unit": "s" }
+            "tooltip": {
+              "show": true,
+              "yHistogram": false
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "reverse": false,
+              "unit": "s"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "sum(increase(http_server_request_duration_seconds_bucket[5m])) by (le)",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "sum(increase(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[$__rate_interval])) by (le)",
               "format": "heatmap",
               "legendFormat": "{{le}}",
               "refId": "A"
             }
           ],
-          "title": "Latency Heatmap - Beyla Services (s)",
+          "title": "Latency Heatmap (request duration)",
           "type": "heatmap"
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 31
+          },
           "id": 5,
           "panels": [],
           "title": "Endpoints Performance",
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } },
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                }
+              },
               "mappings": []
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 10, "x": 0, "y": 32 },
+          "gridPos": {
+            "h": 8,
+            "w": 10,
+            "x": 0,
+            "y": 32
+          },
           "id": 6,
           "options": {
-            "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": [
+                "value",
+                "percent"
+              ]
+            },
             "pieType": "donut",
-            "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
-            "tooltip": { "mode": "multi" }
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "topk(10, sum by (unified_endpoint) (label_replace(rate(http_requests_total[5m]), \"unified_endpoint\", \"$1\", \"endpoint\", \"(.+)\")))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "topk(10, (sum by (unified_endpoint) (label_replace(rate(http_requests_total{service_name=~\"$service\"}[5m]), \"unified_endpoint\", \"$1\", \"endpoint\", \"(.+)\")) or vector(0)))",
               "legendFormat": "{{unified_endpoint}}",
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "topk(10, sum by (unified_endpoint) (label_replace(rate(http_server_request_duration_seconds_count[5m]), \"unified_endpoint\", \"$1\", \"http_route\", \"(.+)\")))",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "topk(10, (sum by (unified_endpoint) (label_replace(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]), \"unified_endpoint\", \"$1\", \"http_route\", \"(.+)\")) or vector(0)))",
               "legendFormat": "{{unified_endpoint}}",
               "refId": "B"
             }
@@ -515,122 +964,344 @@ data:
           "type": "piechart"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
           "description": "Detailed per-endpoint statistics with color-coded health indicators. Combines SDK (http_requests_total) and Beyla (http_server_request_duration_seconds) metrics.",
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "thresholds" },
-              "custom": { "align": "center", "cellOptions": { "type": "auto" }, "inspect": false },
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "center",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
               "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Error Rate" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Error Rate"
+                },
                 "properties": [
-                  { "id": "unit", "value": "percentunit" },
-                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 0.01 }, { "color": "red", "value": 0.05 } ] } }
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background",
+                      "mode": "gradient"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "#EAB839",
+                          "value": 0.01
+                        },
+                        {
+                          "color": "red",
+                          "value": 0.05
+                        }
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Req/s" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Req/s"
+                },
                 "properties": [
-                  { "id": "unit", "value": "reqps" },
-                  { "id": "decimals", "value": 2 },
-                  { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "blue", "value": null }, { "color": "green", "value": 1 }, { "color": "yellow", "value": 10 } ] } }
+                  {
+                    "id": "unit",
+                    "value": "reqps"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "blue",
+                          "value": null
+                        },
+                        {
+                          "color": "green",
+                          "value": 1
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 10
+                        }
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "P50 Latency" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "P50 Latency"
+                },
                 "properties": [
-                  { "id": "unit", "value": "ms" },
-                  { "id": "decimals", "value": 0 },
-                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 200 }, { "color": "red", "value": 500 } ] } }
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background",
+                      "mode": "gradient"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "#EAB839",
+                          "value": 200
+                        },
+                        {
+                          "color": "red",
+                          "value": 500
+                        }
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "P95 Latency" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "P95 Latency"
+                },
                 "properties": [
-                  { "id": "unit", "value": "ms" },
-                  { "id": "decimals", "value": 0 },
-                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-                  { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "#EAB839", "value": 300 }, { "color": "red", "value": 800 } ] } }
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-background",
+                      "mode": "gradient"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "#EAB839",
+                          "value": 300
+                        },
+                        {
+                          "color": "red",
+                          "value": 800
+                        }
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Source" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Source"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 65 },
-                  { "id": "custom.cellOptions", "value": { "type": "color-text" } },
-                  { "id": "mappings", "value": [ { "type": "value", "options": { "SDK": { "text": "SDK", "color": "green", "index": 0 }, "Beyla": { "text": "Beyla", "color": "purple", "index": 1 } } } ] }
+                  {
+                    "id": "custom.width",
+                    "value": 65
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "SDK": {
+                            "text": "SDK",
+                            "color": "green",
+                            "index": 0
+                          },
+                          "Beyla": {
+                            "text": "Beyla",
+                            "color": "purple",
+                            "index": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
                 ]
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 14, "x": 10, "y": 32 },
+          "gridPos": {
+            "h": 8,
+            "w": 14,
+            "x": 10,
+            "y": 32
+          },
           "id": 7,
           "options": {
             "cellHeight": "sm",
-            "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
             "showHeader": true,
-            "sortBy": [ { "displayName": "Req/s", "desc": true } ]
+            "sortBy": [
+              {
+                "displayName": "Req/s",
+                "desc": true
+              }
+            ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(sum by (endpoint, service_name) (rate(http_requests_total[5m])), \"source\", \"SDK\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(sum by (endpoint, service_name) (rate(http_requests_total{service_name=~\"$service\"}[5m])), \"source\", \"SDK\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "A"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(sum by (endpoint, service_name) (rate(http_requests_total{http_status_code=~\"5..\"}[5m])) / sum by (endpoint, service_name) (rate(http_requests_total[5m])), \"source\", \"SDK\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(sum by (endpoint, service_name) (rate(http_requests_total{service_name=~\"$service\",http_status_code=~\"5..\"}[5m])) / sum by (endpoint, service_name) (rate(http_requests_total{service_name=~\"$service\"}[5m])), \"source\", \"SDK\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "B"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(histogram_quantile(0.5, sum by (le, endpoint, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))), \"source\", \"SDK\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(histogram_quantile(0.5, sum by (le, endpoint, service_name) (rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m]))), \"source\", \"SDK\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "C"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(histogram_quantile(0.95, sum by (le, endpoint, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))), \"source\", \"SDK\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(histogram_quantile(0.95, sum by (le, endpoint, service_name) (rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m]))), \"source\", \"SDK\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "D"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(label_replace(sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count[5m])), \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(label_replace(sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "E"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(label_replace(sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count[5m])), \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "label_replace(label_replace(sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\",http_response_status_code=~\"5..\"}[5m])) / sum by (http_route, service_name) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
               "format": "table",
               "instant": true,
               "refId": "F"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(label_replace(histogram_quantile(0.5, sum by (le, http_route, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))) * 1000, \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(label_replace(label_replace(histogram_quantile(0.5, sum by (le, http_route, service_name) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m]))) * 1000, \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")) or (histogram_quantile(0.5, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "format": "table",
               "instant": true,
               "refId": "G"
             },
             {
-              "datasource": { "type": "prometheus", "uid": "Prometheus" },
-              "expr": "label_replace(label_replace(histogram_quantile(0.95, sum by (le, http_route, service_name) (rate(http_server_request_duration_seconds_bucket[5m]))) * 1000, \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "expr": "(label_replace(label_replace(histogram_quantile(0.95, sum by (le, http_route, service_name) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m]))) * 1000, \"endpoint\", \"$1\", \"http_route\", \"(.+)\"), \"source\", \"Beyla\", \"service_name\", \".+\")) or (histogram_quantile(0.95, sum by (le, service_name) (rate(http_server_duration_milliseconds_bucket[5m]))))",
               "format": "table",
               "instant": true,
               "refId": "H"
@@ -638,13 +1309,44 @@ data:
           ],
           "title": "Endpoints Statistics",
           "transformations": [
-            { "id": "merge", "options": {} },
+            {
+              "id": "merge",
+              "options": {}
+            },
             {
               "id": "organize",
               "options": {
-                "excludeByName": { "Time": true, "le": true, "http_route": true },
-                "indexByName": { "service_name": 0, "source": 1, "endpoint": 2, "Value #A": 3, "Value #E": 3, "Value #B": 4, "Value #F": 4, "Value #C": 5, "Value #G": 5, "Value #D": 6, "Value #H": 6 },
-                "renameByName": { "Value #A": "Req/s", "Value #E": "Req/s", "Value #B": "Error Rate", "Value #F": "Error Rate", "Value #C": "P50 Latency", "Value #G": "P50 Latency", "Value #D": "P95 Latency", "Value #H": "P95 Latency", "endpoint": "Endpoint", "service_name": "Service", "source": "Source" }
+                "excludeByName": {
+                  "Time": true,
+                  "le": true,
+                  "http_route": true
+                },
+                "indexByName": {
+                  "service_name": 0,
+                  "source": 1,
+                  "endpoint": 2,
+                  "Value #A": 3,
+                  "Value #E": 3,
+                  "Value #B": 4,
+                  "Value #F": 4,
+                  "Value #C": 5,
+                  "Value #G": 5,
+                  "Value #D": 6,
+                  "Value #H": 6
+                },
+                "renameByName": {
+                  "Value #A": "Req/s",
+                  "Value #E": "Req/s",
+                  "Value #B": "Error Rate",
+                  "Value #F": "Error Rate",
+                  "Value #C": "P50 Latency",
+                  "Value #G": "P50 Latency",
+                  "Value #D": "P95 Latency",
+                  "Value #H": "P95 Latency",
+                  "endpoint": "Endpoint",
+                  "service_name": "Service",
+                  "source": "Source"
+                }
               }
             }
           ],
@@ -654,10 +1356,99 @@ data:
       "refresh": "10s",
       "schemaVersion": 38,
       "style": "dark",
-      "tags": ["opentelemetry", "services", "overview", "red-metrics", "beyla"],
-      "templating": { "list": [] },
-      "time": { "from": "now-15m", "to": "now" },
-      "timepicker": {},
+      "tags": [
+        "apm",
+        "beyla",
+        "opentelemetry",
+        "otel",
+        "overview",
+        "red-metrics",
+        "services"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "definition": "label_values(http_requests_total, service_name)",
+            "query": {
+              "query": "label_values(http_requests_total, service_name)",
+              "refId": "service"
+            },
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "current": {
+              "selected": true,
+              "text": [
+                "All"
+              ],
+              "value": [
+                "$__all"
+              ]
+            },
+            "refresh": 2,
+            "sort": 1
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "Prometheus"
+            },
+            "definition": "label_values(http_requests_total, service_namespace)",
+            "query": {
+              "query": "label_values(http_requests_total, service_namespace)",
+              "refId": "namespace"
+            },
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".*",
+            "current": {
+              "selected": true,
+              "text": [
+                "All"
+              ],
+              "value": [
+                "$__all"
+              ]
+            },
+            "refresh": 2,
+            "sort": 1
+          }
+        ]
+      },
+      "time": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "1h"
+        ],
+        "time_options": [
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "3h",
+          "6h",
+          "12h",
+          "24h"
+        ]
+      },
       "timezone": "",
       "title": "OpenTelemetry - Service Overview",
       "uid": "otel-service-overview",

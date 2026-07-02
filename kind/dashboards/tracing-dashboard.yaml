@@ -4,266 +4,934 @@ metadata:
   name: tracing-dashboard
   namespace: monitoring
   labels:
-    grafana_dashboard: "1"
+    grafana_dashboard: '1'
 data:
   tracing.json: |
-   {
-     "annotations": {
-       "list": [
-         {
-           "builtIn": 1,
-           "datasource": { "type": "grafana", "uid": "-- Grafana --" },
-           "enable": true,
-           "hide": true,
-           "iconColor": "rgba(0, 211, 255, 1)",
-           "name": "Annotations & Alerts",
-           "type": "dashboard"
-         }
-       ]
-     },
-     "description": "Distributed tracing powered by Tempo. View errors, slow traces, and full request flows across all microservices.",
-     "editable": true,
-     "fiscalYearStartMonth": 0,
-     "graphTooltip": 0,
-     "id": null,
-     "links": [
-       {
-         "asDropdown": true,
-         "icon": "external link",
-         "includeVars": false,
-         "keepTime": true,
-         "tags": [],
-         "targetBlank": false,
-         "title": "Navigate",
-         "type": "dashboards"
-       }
-     ],
-     "liveNow": false,
-     "panels": [
-       {
-         "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
-         "id": 1,
-         "options": {
-           "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
-           "content": "<div style=\"padding:6px 0\">\n  <div style=\"font-size:24px;font-weight:700;color:#fff\">Distributed Tracing</div>\n  <div style=\"font-size:13px;color:#8e8e8e;margin-top:4px\">Powered by <strong style=\"color:#8F3BB8\">Tempo</strong> &mdash; Click on any trace to view the full span waterfall. Services: <strong>orders-service</strong>, <strong>products-service</strong>, <strong>shipping-service</strong></div>\n</div>",
-           "mode": "html"
-         },
-         "transparent": true,
-         "type": "text"
-       },
-       {
-         "collapsed": false,
-         "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
-         "id": 2,
-         "panels": [],
-         "title": "orders-service",
-         "type": "row"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for orders-service with error status or HTTP 500+",
-         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-         "id": 3,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Start time" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"orders-service\" && (status = error || span.http.status_code >= 500) }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Recent Errors (Orders)",
-         "type": "table"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for orders-service taking longer than 500ms",
-         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-         "id": 4,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Duration" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"orders-service\" && duration > 500ms }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Slow Traces > 500ms (Orders)",
-         "type": "table"
-       },
-       {
-         "collapsed": false,
-         "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
-         "id": 5,
-         "panels": [],
-         "title": "products-service",
-         "type": "row"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for products-service with error status or HTTP 500+",
-         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-         "id": 6,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Start time" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"products-service\" && (status = error || span.http.status_code >= 500) }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Recent Errors (Products)",
-         "type": "table"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for products-service taking longer than 500ms",
-         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
-         "id": 7,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Duration" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"products-service\" && duration > 500ms }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Slow Traces > 500ms (Products)",
-         "type": "table"
-       },
-       {
-         "collapsed": false,
-         "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
-         "id": 10,
-         "panels": [],
-         "title": "shipping-service (Beyla eBPF Auto-Instrumentation)",
-         "type": "row"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for shipping-service with error status or HTTP 500+. This service is auto-instrumented via Beyla eBPF.",
-         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
-         "id": 11,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Start time" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"shipping-service\" && (status = error || span.http.status_code >= 500) }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Recent Errors (Shipping - Beyla)",
-         "type": "table"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Traces for shipping-service taking longer than 500ms",
-         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
-         "id": 12,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Duration" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ resource.service.name = \"shipping-service\" && duration > 500ms }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "Slow Traces > 500ms (Shipping - Beyla)",
-         "type": "table"
-       },
-       {
-         "collapsed": false,
-         "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
-         "id": 8,
-         "panels": [],
-         "title": "Advanced Explorer",
-         "type": "row"
-       },
-       {
-         "datasource": { "type": "tempo", "uid": "${datasource}" },
-         "description": "Explore all traces without predefined filters. Use TraceQL to build custom queries.",
-         "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
-         "id": 9,
-         "options": {
-           "cellHeight": "sm",
-           "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-           "showHeader": true,
-           "sortBy": [ { "desc": true, "displayName": "Start time" } ]
-         },
-         "targets": [
-           {
-             "datasource": { "type": "tempo", "uid": "${datasource}" },
-             "query": "{ }",
-             "queryType": "traceql",
-             "refId": "A"
-           }
-         ],
-         "title": "All Traces Explorer",
-         "type": "table"
-       }
-     ],
-     "schemaVersion": 38,
-     "style": "dark",
-     "tags": ["tempo", "traces", "opentelemetry"],
-     "templating": {
-       "list": [
-         {
-           "current": { "selected": false, "text": "Tempo", "value": "Tempo" },
-           "hide": 0,
-           "includeAll": false,
-           "label": "Datasource",
-           "multi": false,
-           "name": "datasource",
-           "options": [],
-           "query": "tempo",
-           "refresh": 1,
-           "regex": "",
-           "skipUrlSync": false,
-           "type": "datasource"
-         }
-       ]
-     },
-     "time": { "from": "now-1h", "to": "now" },
-     "timepicker": {},
-     "timezone": "",
-     "title": "Distributed Tracing",
-     "uid": "super-traces-poc-v1",
-     "version": 1,
-     "weekStart": ""
-   }
+    {
+      "uid": "super-traces-poc-v1",
+      "title": "Distributed Tracing",
+      "description": "Distributed tracing powered by Tempo: service map, RED metrics from spans, latency heatmap and a trace explorer that opens the full span waterfall.",
+      "tags": [
+        "apm",
+        "opentelemetry",
+        "otel",
+        "tempo",
+        "traces"
+      ],
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "graphTooltip": 1,
+      "refresh": "30s",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "",
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": true,
+          "keepTime": true,
+          "tags": [
+            "apm"
+          ],
+          "targetBlank": false,
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "red",
+            "name": "Deploys & Incidents",
+            "target": {
+              "limit": 100,
+              "matchAny": true,
+              "tags": [
+                "deploy",
+                "incident"
+              ],
+              "type": "tags"
+            }
+          }
+        ]
+      },
+      "templating": {
+        "list": []
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "text",
+          "transparent": true,
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "options": {
+            "mode": "html",
+            "content": "<div style=\"padding:6px 0\"><div style=\"font-size:24px;font-weight:700;color:#fff\">Distributed Tracing</div><div style=\"font-size:13px;color:#8e8e8e;margin-top:4px\">Powered by <strong style=\"color:#8F3BB8\">Tempo</strong> &mdash; follow a request across <strong>products</strong>, <strong>orders</strong>, <strong>shipping</strong> and the <strong>frontend</strong>. RED metrics are derived from spans; click any trace row to open the full span <strong>waterfall</strong>, then jump to its logs, metrics and flame graph.</div></div>"
+          }
+        },
+        {
+          "id": 100,
+          "type": "row",
+          "title": "Overview",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 3
+          },
+          "panels": []
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Span throughput",
+          "description": "Spans/sec across all services (from span metrics).",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto",
+            "justifyMode": "auto"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(traces_spanmetrics_calls_total[$__rate_interval]))",
+              "legendFormat": "",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Error rate",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto",
+            "justifyMode": "auto"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "100 * sum(rate(traces_spanmetrics_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval])) / clamp_min(sum(rate(traces_spanmetrics_calls_total[$__rate_interval])),0.0001)",
+              "legendFormat": "",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "p95 span latency",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.3
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.5
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto",
+            "justifyMode": "auto"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket[$__rate_interval])))",
+              "legendFormat": "",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Active services",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "color": {
+                "mode": "thresholds"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto",
+            "justifyMode": "auto"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "count(count by (service) (traces_spanmetrics_calls_total))",
+              "legendFormat": "",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 101,
+          "type": "row",
+          "title": "Service map \u2014 live trace dependencies",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 8
+          },
+          "panels": []
+        },
+        {
+          "id": 6,
+          "type": "nodeGraph",
+          "title": "Service map",
+          "datasource": {
+            "type": "tempo",
+            "uid": "Tempo"
+          },
+          "description": "Built by Tempo from the traces flowing right now (user \u2192 services and service \u2192 service).",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 9
+          },
+          "options": {},
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "Tempo"
+              },
+              "queryType": "serviceMap",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 102,
+          "type": "row",
+          "title": "RED metrics \u2014 derived from spans",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 19
+          },
+          "panels": []
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Request rate by service",
+          "description": "Span rate per service.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 20
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              },
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum by (service) (rate(traces_spanmetrics_calls_total[$__rate_interval]))",
+              "legendFormat": "{{service}}",
+              "range": true,
+              "instant": false,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Error rate by service",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 20
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": true,
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "100 * sum by (service) (rate(traces_spanmetrics_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval])) / clamp_min(sum by (service) (rate(traces_spanmetrics_calls_total[$__rate_interval])),0.0001)",
+              "legendFormat": "{{service}}",
+              "range": true,
+              "instant": false,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "p95 latency by service",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 20
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": true,
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (service, le) (rate(traces_spanmetrics_latency_bucket[$__rate_interval])))",
+              "legendFormat": "{{service}}",
+              "range": true,
+              "instant": false,
+              "format": "time_series"
+            }
+          ]
+        },
+        {
+          "id": 103,
+          "type": "row",
+          "title": "Latency distribution & top operations",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 28
+          },
+          "panels": []
+        },
+        {
+          "id": 10,
+          "type": "heatmap",
+          "title": "Span latency heatmap",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Distribution of span durations over time (from span-metrics histogram buckets).",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 29
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(traces_spanmetrics_latency_bucket[$__rate_interval])) by (le)",
+              "format": "heatmap",
+              "legendFormat": "{{le}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "calculate": false,
+            "cellGap": 1,
+            "color": {
+              "mode": "scheme",
+              "scheme": "Spectral",
+              "steps": 64
+            },
+            "yAxis": {
+              "unit": "s",
+              "decimals": 2
+            },
+            "tooltip": {
+              "show": true,
+              "yHistogram": true
+            },
+            "legend": {
+              "show": true
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                }
+              }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 11,
+          "type": "table",
+          "title": "Top operations (server spans)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "description": "Busiest server operations by span rate.",
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 29
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+              },
+              "editorMode": "code",
+              "expr": "topk(15, sum by (service, span_name) (rate(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}[$__rate_interval])))",
+              "legendFormat": "",
+              "range": false,
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Spans/s"
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "service": "Service",
+                  "span_name": "Operation",
+                  "Value": "Spans/s"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto"
+              },
+              "decimals": 2
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Spans/s"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "reqps"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": 104,
+          "type": "row",
+          "title": "Trace explorer \u2014 click a row to open the full waterfall",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 38
+          },
+          "panels": []
+        },
+        {
+          "id": 12,
+          "type": "table",
+          "title": "Recent errors (all services)",
+          "description": "Every errored trace; click to open the waterfall and pivot to logs.",
+          "datasource": {
+            "type": "tempo",
+            "uid": "Tempo"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 39
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Start time"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "Tempo"
+              },
+              "queryType": "traceql",
+              "query": "{ status = error }",
+              "refId": "A",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "table",
+          "title": "Slowest traces (> 100ms)",
+          "description": "Slowest traces across the platform.",
+          "datasource": {
+            "type": "tempo",
+            "uid": "Tempo"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 39
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Start time"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "Tempo"
+              },
+              "queryType": "traceql",
+              "query": "{ duration > 100ms }",
+              "refId": "A",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "table",
+          "title": "All traces explorer",
+          "description": "Browse all recent traces. Edit the TraceQL to filter.",
+          "datasource": {
+            "type": "tempo",
+            "uid": "Tempo"
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 48
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Start time"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "Tempo"
+              },
+              "queryType": "traceql",
+              "query": "{}",
+              "refId": "A",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        }
+      ]
+    }

@@ -30,5 +30,8 @@ Thumbs.db
 # Claude Code
 .claude/
 
+# Kiro CLI
+.kiro/
+
 # Python
 __pycache__/

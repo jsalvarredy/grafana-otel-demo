@@ -10,6 +10,29 @@ server:
       cpu: 500m
       memory: 512Mi
 
+  # Keep a bit more history so the demo dashboards have data to show.
+  retention: "15d"
+
+  # Feature flags:
+  #  - web.enable-remote-write-receiver: lets Tempo's metrics-generator push
+  #    span metrics & service-graph metrics into Prometheus (powers the APM
+  #    Service Map). Without this, Tempo remote_write fails.
+  #  - web.enable-lifecycle: allows config reloads via HTTP.
+  extraFlags:
+    - web.enable-lifecycle
+    - web.enable-remote-write-receiver
+
+  # Enable exemplar storage so a latency spike on a Prometheus graph can link
+  # straight to the matching trace in Tempo (metric -> trace correlation).
+  # NOTE: exemplar storage is a feature flag (not a --storage.tsdb.* flag) and
+  # the limit is set in the config file (server.exemplars below).
+  extraArgs:
+    enable-feature: exemplar-storage
+
+  # Exemplar storage config (rendered into prometheus.yml by the chart).
+  exemplars:
+    max_exemplars: 100000
+
 alertmanager:
   enabled: false
 
@@ -21,3 +44,139 @@ nodeExporter:
 
 kubeStateMetrics:
   enabled: true # Useful for K8s metrics
+
+# ===========================================================================
+# Recording rules: SLO error ratios + multi-window burn rates (Google SRE
+# workbook style). Precomputed here so the SLO dashboard and the multi-burn
+# alerts in Grafana stay cheap and consistent. Validated with
+# `promtool check rules`. Alertmanager is disabled (alerting lives in
+# Grafana), so we ship ONLY recording rules to Prometheus, not alerting rules.
+#   burn rate = error_ratio / error_budget;  99.9% SLO -> budget = 0.001
+# ===========================================================================
+serverFiles:
+  recording_rules.yml:
+    groups:
+      - name: slo_http_error_ratio
+        interval: 30s
+        rules:
+          - record: job:http_errors:ratio_rate5m
+            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1)
+          - record: job:http_errors:ratio_rate30m
+            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[30m])) / clamp_min(sum(rate(http_requests_total[30m])), 1)
+          - record: job:http_errors:ratio_rate1h
+            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[1h])) / clamp_min(sum(rate(http_requests_total[1h])), 1)
+          - record: job:http_errors:ratio_rate6h
+            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[6h])) / clamp_min(sum(rate(http_requests_total[6h])), 1)
+          - record: service:http_errors:ratio_rate5m
+            expr: sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[5m])) / clamp_min(sum by (service_name) (rate(http_requests_total[5m])), 1)
+          - record: service:http_errors:ratio_rate1h
+            expr: sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[1h])) / clamp_min(sum by (service_name) (rate(http_requests_total[1h])), 1)
+      - name: slo_http_burnrate
+        interval: 30s
+        rules:
+          - record: job:http_errors:burnrate5m
+            expr: job:http_errors:ratio_rate5m / 0.001
+          - record: job:http_errors:burnrate30m
+            expr: job:http_errors:ratio_rate30m / 0.001
+          - record: job:http_errors:burnrate1h
+            expr: job:http_errors:ratio_rate1h / 0.001
+          - record: job:http_errors:burnrate6h
+            expr: job:http_errors:ratio_rate6h / 0.001
+
+      # =====================================================================
+      # APM Apdex (Application Performance Index) — the headline score New
+      # Relic/AppDynamics put front and center. Apdex turns the latency
+      # histogram into one 0..1 number that says "are users happy?".
+      #
+      #   Apdex_T = (satisfied + tolerating/2) / total
+      #     satisfied  = requests with latency <= T            (happy)
+      #     tolerating = requests with T < latency <= 4T        (putting up with it)
+      #     frustrated = requests with latency > 4T             (unhappy)
+      #
+      # Algebra: (satisfied + tolerating/2)/total == (N_le_T + N_le_4T)/(2*total),
+      # so we only need the CUMULATIVE histogram buckets at T and 4T — no
+      # _sum/_count gymnastics, no quantile interpolation.
+      #
+      # T = 250ms is chosen on purpose: 250ms (T) and 1000ms (4T) are EXACT
+      # bucket edges in BOTH metric families, so the score is precise:
+      #   * SDK apps (products, orders): http_server_duration_milliseconds_bucket
+      #       -> le="250"/"250.0"  (T)   and le="1000"/"1000.0" (4T)   [milliseconds]
+      #   * Java agent (shipping): http_server_request_duration_seconds_bucket
+      #       -> le="0.25"          (T)   and le="1"/"1.0"       (4T)    [seconds]
+      # NOTE on `le` formatting: different Prometheus exporters render integer
+      # bucket boundaries differently. The classic OTel Collector prometheus
+      # exporter added a trailing ".0" (le="250.0"); Grafana Alloy's
+      # otelcol.exporter.prometheus renders bare integers (le="250"). The
+      # `le=~"…"` regex matchers below accept BOTH ("250" or "250.0"), so the
+      # rules survive either exporter without edits. Non-integer edges (0.25)
+      # only ever have one representation.
+      # The two families have disjoint service_name sets, so `or` unions them.
+      # To retune T, pick new `le` values that are real bucket boundaries.
+      # =====================================================================
+      - name: apm_apdex
+        interval: 30s
+        rules:
+          # ---- Per-service building blocks (rate of cumulative buckets) ----
+          # Satisfied: requests served within T.
+          - record: service:apdex_satisfied:rate5m
+            expr: |
+              sum by (service_name) (rate(http_server_duration_milliseconds_bucket{le=~`250(\.0+)?`}[5m]))
+              or
+              sum by (service_name) (rate(http_server_request_duration_seconds_bucket{le="0.25"}[5m]))
+          # Tolerating boundary: requests served within 4T (this is le=4T, the
+          # cumulative count of satisfied+tolerating — exactly what the formula needs).
+          - record: service:apdex_tolerating:rate5m
+            expr: |
+              sum by (service_name) (rate(http_server_duration_milliseconds_bucket{le=~`1000(\.0+)?`}[5m]))
+              or
+              sum by (service_name) (rate(http_server_request_duration_seconds_bucket{le=~`1(\.0+)?`}[5m]))
+          # Total requests (the +Inf bucket == _count).
+          - record: service:apdex_total:rate5m
+            expr: |
+              sum by (service_name) (rate(http_server_duration_milliseconds_count[5m]))
+              or
+              sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+          # ---- Apdex score per service: (satisfied + tolerating) / (2 * total) ----
+          # No clamp on the denominator: with no traffic the score is absent
+          # (NaN) rather than a misleading number — honest, and the demo always
+          # has traffic when it matters.
+          - record: service:apdex:ratio5m
+            expr: |
+              (service:apdex_satisfied:rate5m + service:apdex_tolerating:rate5m)
+              /
+              (2 * service:apdex_total:rate5m)
+          # ---- Global Apdex across the whole platform (volume-weighted) ----
+          - record: job:apdex:ratio5m
+            expr: |
+              (sum(service:apdex_satisfied:rate5m) + sum(service:apdex_tolerating:rate5m))
+              /
+              (2 * sum(service:apdex_total:rate5m))
+
+# Extra scrape configs. Exemplars used to require a dedicated OpenMetrics
+# scrape job against the old otel-collector's Prometheus exporter; since
+# Fase 2, Alloy's otelcol.exporter.prometheus pushes metrics (with exemplars
+# carried natively) straight to this remote-write receiver, so that job is
+# gone. Only the synthetic/blackbox probes remain here.
+extraScrapeConfigs: |
+  # Synthetic / blackbox probes. Prometheus asks the blackbox-exporter to probe
+  # each health endpoint and records probe_success / probe_duration_seconds /
+  # probe_http_status_code, labelled by the target URL (instance). This is the
+  # external "is it up?" view, independent of the apps' own instrumentation.
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - http://otel-demo-app.demo.svc.cluster.local:8080/health
+          - http://otel-python-app.demo.svc.cluster.local:8080/health
+          - http://shipping-service.demo.svc.cluster.local:8080/api/health
+          - http://grafana.monitoring.svc.cluster.local/api/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter.monitoring.svc.cluster.local:9115
