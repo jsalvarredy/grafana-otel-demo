@@ -2,6 +2,26 @@
 
 This document explains how Grafana's **Beyla** auto-instruments the Shipping Service without touching application code.
 
+> **Default vs opt-in.** Out of the box the Shipping Service is auto-instrumented
+> by the **OpenTelemetry Java agent** (bytecode injection, baked into the image),
+> because it works on **any kernel** and makes the demo reliable everywhere.
+> **Beyla (eBPF) is a one-flag opt-in** that requires a **BTF-enabled kernel**
+> (`CONFIG_DEBUG_INFO_BTF=y`). Both need **zero application code changes** and both
+> emit the same `http_server_request_duration_seconds_*` RED metrics, so the
+> dashboards work either way. To switch Shipping from the Java agent to Beyla:
+>
+> ```yaml
+> # charts/shipping-service/values.yaml
+> instrumentation:
+>   javaAgent:
+>     enabled: false   # turn the Java agent off...
+> beyla:
+>   enabled: true      # ...and the eBPF sidecar on (needs a BTF kernel)
+> ```
+>
+> Keep exactly one enabled to avoid double-counting HTTP metrics. The rest of
+> this guide is the Beyla deep-dive and a comparison of when to prefer each.
+
 ## What is Beyla?
 
 [Beyla](https://github.com/grafana/beyla) is a Grafana tool that uses **eBPF (Extended Berkeley Packet Filter)** to capture application telemetry automatically. No need to:
@@ -49,7 +69,7 @@ Beyla runs as a **sidecar** alongside the application and uses eBPF to:
 |---------|----------|-----------------|-----------|
 | Products Service | Node.js | OTEL SDK (manual) | Traces, Metrics, Logs |
 | Orders Service | Python | OTEL SDK (manual) | Traces, Metrics, Logs |
-| **Shipping Service** | Java | **Beyla eBPF** | Traces, RED Metrics |
+| **Shipping Service** | Java | **OTel Java agent** (default) / **Beyla eBPF** (opt-in) | Traces, RED Metrics |
 
 ### Distributed trace flow
 
