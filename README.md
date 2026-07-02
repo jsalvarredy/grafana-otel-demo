@@ -14,6 +14,8 @@ If any of these apply to you, keep reading:
 - **Retention**: You need more than 8-15 days of data without paying extra
 - **Vendor lock-in**: You want to own your observability stack
 
+If you are evaluating this as a Datadog or New Relic alternative, start with [FOR_CTOS.md](FOR_CTOS.md): what it replaces, the cost math, and the honest tradeoffs.
+
 ## What You Get
 
 | Capability | This Stack | Datadog | NewRelic |
@@ -189,6 +191,7 @@ timeline tells the story by itself. Pairs with the [DEMO.md](DEMO.md) script.
 
 | Document | Description |
 |----------|-------------|
+| [FOR_CTOS.md](FOR_CTOS.md) | **Brief for engineering leaders**: what this replaces from Datadog and New Relic, the cost math, and the honest tradeoffs |
 | [DEMO.md](DEMO.md) | **Guided 12-minute demo script** — a full incident story, click by click |
 | [docs/API.md](docs/API.md) | REST API reference for all 3 services |
 | [docs/BEYLA.md](docs/BEYLA.md) | Beyla eBPF auto-instrumentation guide |
