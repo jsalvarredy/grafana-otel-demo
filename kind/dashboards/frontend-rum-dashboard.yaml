@@ -1,0 +1,561 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-rum-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: '1'
+data:
+  frontend-rum.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Real User Monitoring from Grafana Faro: browser errors, events and Web Vitals, linked to full-stack traces in Tempo.",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [
+        {
+          "asDropdown": true,
+          "icon": "external link",
+          "includeVars": true,
+          "keepTime": true,
+          "tags": [
+            "apm"
+          ],
+          "targetBlank": false,
+          "title": "APM Dashboards",
+          "tooltip": "Jump to another dashboard",
+          "type": "dashboards",
+          "url": ""
+        }
+      ],
+      "panels": [
+        {
+          "gridPos": {
+            "h": 3,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "type": "text",
+          "transparent": true,
+          "options": {
+            "mode": "html",
+            "content": "<div style=\"padding:6px 0\"><div style=\"font-size:24px;font-weight:700;color:#fff\">Frontend / Real User Monitoring</div><div style=\"font-size:13px;color:#8e8e8e;margin-top:4px\">Browser telemetry from <strong style=\"color:#F5A623\">Grafana Faro</strong> on the Faro Shop SPA, shipped through <strong>Alloy</strong> (faro.receiver) to Loki and Tempo. Errors, events and Web Vitals here; the browser-&gt;backend traces are in Tempo / Traces Drilldown.</div></div>"
+          }
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 3
+          },
+          "id": 2,
+          "type": "stat",
+          "description": "JS exceptions captured by Faro",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "unit": "short",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 10
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({source=\"faro\"} | logfmt | kind=`exception` [1h]))",
+              "queryType": "instant",
+              "legendFormat": "Frontend errors (1h)",
+              "refId": "A"
+            }
+          ],
+          "title": "Frontend errors (1h)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 3
+          },
+          "id": 3,
+          "type": "stat",
+          "description": "Session/navigation events",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "unit": "short",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({source=\"faro\"} | logfmt | kind=`event` [1h]))",
+              "queryType": "instant",
+              "legendFormat": "Events (1h)",
+              "refId": "A"
+            }
+          ],
+          "title": "Events (1h)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 3
+          },
+          "id": 4,
+          "type": "stat",
+          "description": "Web Vitals & perf measurements",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "purple"
+              },
+              "unit": "short",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({source=\"faro\"} | logfmt | kind=`measurement` [1h]))",
+              "queryType": "instant",
+              "legendFormat": "Measurements (1h)",
+              "refId": "A"
+            }
+          ],
+          "title": "Measurements (1h)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 3
+          },
+          "id": 5,
+          "type": "stat",
+          "description": "All Faro signals received",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "unit": "short",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({source=\"faro\"} [1h]))",
+              "queryType": "instant",
+              "legendFormat": "RUM signals (1h)",
+              "refId": "A"
+            }
+          ],
+          "title": "RUM signals (1h)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 7
+          },
+          "id": 6,
+          "type": "timeseries",
+          "description": "Rate of JS exceptions reported by the browser",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              "unit": "short",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "sum(count_over_time({source=\"faro\"} | logfmt | kind=`exception` [$__auto]))",
+              "queryType": "range",
+              "legendFormat": "exceptions",
+              "refId": "A"
+            }
+          ],
+          "title": "Frontend errors over time"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 7
+          },
+          "id": 7,
+          "type": "timeseries",
+          "description": "Core Web Vitals from Faro measurements. Field names (lcp/fcp/ttfb) may need adjusting once live data is seen.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              "unit": "ms",
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "avg_over_time({source=\"faro\"} | logfmt | kind=`measurement` | unwrap lcp [$__auto])",
+              "queryType": "range",
+              "legendFormat": "LCP",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "avg_over_time({source=\"faro\"} | logfmt | kind=`measurement` | unwrap fcp [$__auto])",
+              "queryType": "range",
+              "legendFormat": "FCP",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "avg_over_time({source=\"faro\"} | logfmt | kind=`measurement` | unwrap ttfb [$__auto])",
+              "queryType": "range",
+              "legendFormat": "TTFB",
+              "refId": "C"
+            }
+          ],
+          "title": "Core Web Vitals (ms)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 16
+          },
+          "id": 8,
+          "type": "logs",
+          "description": "Live JS exceptions with stack traces",
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "{source=\"faro\"} | logfmt | kind=`exception`",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Frontend exceptions (live)"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 16
+          },
+          "id": 9,
+          "type": "logs",
+          "description": "Live session events and Web Vitals measurements",
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "Loki"
+              },
+              "editorMode": "code",
+              "expr": "{source=\"faro\"} | logfmt | kind=~`event|measurement`",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Frontend events & measurements (live)"
+        },
+        {
+          "gridPos": {
+            "h": 4,
+            "w": 24,
+            "x": 0,
+            "y": 25
+          },
+          "id": 10,
+          "type": "text",
+          "transparent": true,
+          "options": {
+            "mode": "html",
+            "content": "<div style=\"padding:6px 0;color:#8e8e8e;font-size:13px\">Full-stack trace: in the <strong>Faro Shop</strong> click <em>Place order</em>, then open <strong>Traces Drilldown</strong> or the Tempo data source and find the latest trace for <code>frontend-shop</code>. The browser span links straight into <code>orders-service</code> and <code>products-service</code> &mdash; one trace from the click to the database.</div>"
+          }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": [
+        "apm",
+        "otel",
+        "rum",
+        "faro"
+      ],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "",
+      "title": "Frontend / RUM",
+      "uid": "frontend-rum",
+      "version": 1,
+      "weekStart": "",
+      "timepicker": {
+        "refresh_intervals": [
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "1h"
+        ]
+      }
+    }

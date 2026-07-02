@@ -1,0 +1,46 @@
+# Mini e-commerce frontend instrumented with Grafana Faro.
+# nginx serves a static SPA (Faro Web SDK + web tracing vendored same-origin at
+# /vendor, pinned, baked into the image - no CDN egress from the browser) and
+# reverse-proxies /api/* to the backend services on the SAME origin, so the
+# browser's traceparent header propagates to the backend with no CORS needed.
+
+image:
+  # Local image built by setup.sh (nginx + Faro SDK vendored at /vendor),
+  # loaded into Kind. Use Never so Kind serves the locally loaded image.
+  repository: frontend-service
+  tag: "latest"
+  pullPolicy: Never
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: shop.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+# Where the browser ships RUM data (the Alloy faro.receiver ingress).
+faro:
+  collectorUrl: "http://faro.127.0.0.1.nip.io/collect"
+  appName: "frontend-shop"
+  appEnv: "demo"
+
+# Backends proxied same-origin so trace context propagates without CORS.
+backends:
+  products: "http://otel-demo-app.demo.svc.cluster.local:8080"
+  orders: "http://otel-python-app.demo.svc.cluster.local:8080"
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
