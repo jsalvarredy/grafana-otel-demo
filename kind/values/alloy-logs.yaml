@@ -9,10 +9,11 @@
 # (2025-11-01); Alloy is Grafana's supported, go-forward telemetry collector.
 # All log collection now converges on Alloy.
 #
-# CRITICAL: shipping-service (Java) is instrumented by the OTel Java agent,
-# which emits traces+metrics but NOT logs. Its logs come ONLY from this node
-# agent (stdout tail), so `service_name` MUST stay "shipping-service" for the
-# Log Analysis / Logs Search dashboards to keep working.
+# CRITICAL: shipping-service (Java) writes classic stdout logs (its logback
+# pattern has no trace ids). This node agent is what guarantees those logs
+# land in Loki labelled service_name="shipping-service", so the Log Analysis /
+# Logs Search dashboards keep working regardless of what the OTel Java agent
+# ships over OTLP. The `service_name` label mapping below MUST stay intact.
 #
 # Log source: `loki.source.kubernetes` reads pod logs via the Kubernetes API
 # (kubelet), so NO host-path mounts are needed. RBAC (pods, pods/log,

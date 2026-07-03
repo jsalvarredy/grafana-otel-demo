@@ -14,10 +14,10 @@
 # It always keeps a stream of *healthy* background traffic running too, so the
 # error ratio and percentiles look like a real partial outage, not a flatline.
 #
-# By default it targets Products (Node) and Orders (Python), which use the
-# OpenTelemetry SDK and therefore always emit metrics. Shipping (Java) is
-# instrumented by Beyla eBPF, which needs a BTF-enabled kernel; it is opt-in
-# via --include-shipping so the demo works on any laptop.
+# By default it targets Products (Node) and Orders (Python): their real
+# cross-service call (orders -> products) makes the most illustrative trace.
+# Shipping (Java) is auto-instrumented by the OTel Java agent (any kernel) and
+# can be added to the blast radius with --include-shipping.
 #
 # Usage:
 #   ./incident.sh                         # meltdown (errors+latency), 7 min
@@ -70,7 +70,7 @@ ${BOLD}Options:${NC}
   -s, --scenario <name>   latency | errors | meltdown   (default: meltdown)
   -t, --target <name>     products | orders | all        (default: all)
   -d, --duration <secs>   how long to sustain the incident (default: 420)
-      --include-shipping  also hit Shipping (Java/Beyla; needs BTF kernel)
+      --include-shipping  also hit Shipping (Java, OTel Java agent)
   -r, --recover           send only healthy traffic to let alerts clear
       --force             run even if the preflight health check fails
   -h, --help              show this help

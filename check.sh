@@ -139,11 +139,19 @@ if echo "$prof" | grep -q 'products-service'; then ok "Pyroscope has profiles (p
 # ---------------------------------------------------------------------------
 section "Correlation: exemplars (metric → trace)"
 # ---------------------------------------------------------------------------
-ex=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
-  --data-urlencode 'query=http_server_duration_milliseconds_bucket' \
-  --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null \
-  | grep -oE '"traceID":"[a-f0-9]+"' | head -1)
-if [ -n "$ex" ]; then ok "Exemplars present on latency histogram"; else warn "No exemplars in last 15m (need traffic with sampled traces)"; fi
+# Exemplars come from Tempo's span metrics (metrics-generator remote-writes
+# them with send_exemplars: true) - that is what the APM latency panels use.
+# The apps' own JS histograms carry none: the OTel JS SDK does not wire
+# OTEL_METRICS_EXEMPLAR_FILTER yet (unlike Java/Python).
+ex=""
+for fam in traces_spanmetrics_latency_bucket http_server_duration_milliseconds_bucket; do
+  ex=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
+    --data-urlencode "query=$fam" \
+    --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null \
+    | grep -oE '"traceID":"[a-f0-9]+"' | head -1)
+  [ -n "$ex" ] && break
+done
+if [ -n "$ex" ]; then ok "Exemplars present on latency metrics (span metrics)"; else warn "No exemplars in last 15m (need traffic with sampled traces)"; fi
 
 # ---------------------------------------------------------------------------
 section "Drilldown apps (queryless)"

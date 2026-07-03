@@ -5,6 +5,7 @@ adminPassword: "Mikroways123"
 # image tag here. Grafana upgrades are backward compatible, so the 10.5.15 chart
 # works with the v13 image. Bump this as new 13.x patches ship.
 image:
+  # renovate: datasource=docker depName=grafana/grafana
   tag: "13.1.0"
 
 # ===========================================================================

@@ -259,10 +259,11 @@ browser, not just the backend.
 > one trace. That's the Datadog/New Relic RUM story, fully open source, on our
 > own infrastructure."
 
-> Note: the Faro Web SDK is **vendored into the frontend image** (pinned 1.19.0,
-> served same-origin from `/vendor`), so the presenter's browser needs **no CDN
-> egress** — it only posts RUM data to `faro.127.0.0.1.nip.io`. Web Vitals field
-> names in the dashboard may need a tweak once you see real data.
+> Note: the Faro Web SDK is **vendored into the frontend image** (pinned via
+> build ARG in `src/frontend-app/Dockerfile`, served same-origin from
+> `/vendor`), so the presenter's browser needs **no CDN egress** — it only
+> posts RUM data to `faro.127.0.0.1.nip.io`. Web Vitals field names in the
+> dashboard may need a tweak once you see real data.
 
 ---
 

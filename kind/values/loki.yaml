@@ -12,7 +12,7 @@ loki:
       memory: 64Mi
   commonConfig:
     replication_factor: 1
-# Required for OTel Collector compatibility
+# Required for OTLP log ingestion (Grafana Alloy gateway)
   limits_config:
     allow_structured_metadata: true
     max_label_name_length: 1024

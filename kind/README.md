@@ -7,16 +7,22 @@ This directory contains the Kubernetes-in-Docker (Kind) cluster configuration an
 ```
 kind/
 ├── .kind/
-│   └── config.yaml           # Kind cluster definition with port mappings
-├── helmfile.d/               # Helm chart configurations
-│   ├── 04-grafana-stack.yaml # Grafana Stack (Loki, Tempo, Prometheus, Grafana)
-│   └── values/               # Custom Helm values
-│       ├── grafana.yaml
-│       ├── loki.yaml
-│       ├── prometheus.yaml
-│       ├── otel-collector.yaml
-│       └── tempo.yaml
-└── .kube/                    # Generated KUBECONFIG (auto-created)
+│   └── config.yaml               # Kind cluster definition with port mappings
+├── helmfile.d/
+│   └── 04-grafana-stack.yaml     # All releases: ingress-nginx, Prometheus, Loki,
+│                                 # Tempo, Grafana, Alloy (x2), Pyroscope, blackbox
+├── values/                       # Custom Helm values per release
+│   ├── alloy.yaml                # Alloy gateway: Faro receiver + OTLP pipeline
+│   │                             # (k8sattributes, tail sampling, exemplars)
+│   ├── alloy-logs.yaml           # Alloy DaemonSet: pod stdout log tailing -> Loki
+│   ├── blackbox-exporter.yaml    # Synthetic / uptime probes
+│   ├── grafana.yaml              # Datasources, Drilldown apps, provisioned alerts
+│   ├── loki.yaml                 # SingleBinary + memcached
+│   ├── prometheus.yaml           # Remote-write receiver, exemplars, SLO/Apdex rules
+│   ├── pyroscope.yaml            # Continuous profiling backend
+│   └── tempo.yaml                # Local storage + metrics generator (span metrics)
+├── dashboards/                   # 16 Grafana dashboards as ConfigMaps
+└── .kube/                        # Generated KUBECONFIG (auto-created)
 ```
 
 ## Configuration Files
@@ -27,9 +33,12 @@ Defines the Kind cluster with:
 - Extra port mappings (80, 443) for Ingress access
 - Kubernetes version 1.33.4
 
-### `/helmfile.d/`
-Contains Helmfile definitions deployed by `setup.sh`:
-- **Grafana Stack**: Complete observability stack components
+### `helmfile.d/04-grafana-stack.yaml`
+Contains every Helm release deployed by `setup.sh`: the ingress controller,
+the LGTM+P stack (Loki, Grafana, Tempo, Prometheus, Pyroscope), the blackbox
+exporter for synthetic monitoring, and the two Grafana Alloy releases —
+`alloy` (the OTLP/Faro gateway Deployment) and `alloy-logs` (the node log
+collector DaemonSet).
 
 ## Usage
 
@@ -44,6 +53,9 @@ export KUBECONFIG=$PWD/kind/.kube/config
 
 # Apply Helmfiles
 helmfile -f kind/helmfile.d/ apply
+
+# (Re)apply the provisioned dashboards
+kubectl apply -f kind/dashboards/
 ```
 
 ## Notes

@@ -112,11 +112,11 @@ thanosRuler:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: otel-collector-ingress
+  name: alloy-otlp-ingress
 spec:
   podSelector:
     matchLabels:
-      app: otel-collector
+      app.kubernetes.io/instance: alloy
   ingress:
     - from:
         - namespaceSelector:
@@ -131,13 +131,17 @@ spec:
 
 ## Scaling Guidelines
 
-### OpenTelemetry Collector
+### Grafana Alloy (OTLP gateway)
 
 | Throughput | Replicas | CPU | Memory |
 |------------|----------|-----|--------|
 | <10k spans/s | 2 | 500m | 512Mi |
 | 10k-50k spans/s | 3-5 | 1 | 1Gi |
 | >50k spans/s | 5+ | 2 | 2Gi |
+
+Note: this demo runs a single Alloy replica because tail sampling keeps all
+spans of a trace in one process. To scale horizontally, add a load-balancing
+layer that routes by trace ID (or move tail sampling into that tier).
 
 ### Loki Ingester
 

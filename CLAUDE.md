@@ -2,106 +2,132 @@
 
 ## Proyecto
 Prueba de concepto de observabilidad on-premise con Grafana Stack + OpenTelemetry.
-Demuestra alternativa open-source a Datadog/NewRelic.
+Demuestra alternativa open-source a Datadog/NewRelic: cuatro señales (métricas,
+logs, trazas, perfiles) correlacionadas entre sí, RUM, synthetic monitoring,
+SLOs multi-burn-rate y exploración queryless (Drilldown).
 **Owner**: Mikroways (jsalvarredy)
 
-## Stack tecnologico
-- **Orquestacion**: Kind (Kubernetes 1.33.4, single node)
-- **Metricas**: Prometheus 25.11.0
-- **Logs**: Loki 6.6.6 (SingleBinary + Memcached)
-- **Traces**: Tempo 2.8.0 (local filesystem)
-- **Visualizacion**: Grafana (latest, admin/Mikroways123)
-- **Collector**: OpenTelemetry Collector Contrib (v0.145.0)
-- **Auto-instrumentacion**: Beyla eBPF 1.8.4
+## Stack tecnológico
+- **Orquestación**: Kind (Kubernetes 1.33.4, single node)
+- **Métricas**: Prometheus (chart prometheus-community, remote-write receiver + exemplars)
+- **Logs**: Loki (SingleBinary + Memcached)
+- **Trazas**: Tempo 2.8 (filesystem local, metrics-generator activo: span metrics + service graph)
+- **Perfiles**: Pyroscope (continuous profiling, flame graphs)
+- **Visualización**: Grafana 13 (imagen pineada sobre el chart; admin/Mikroways123)
+- **Pipeline de telemetría**: Grafana Alloy en dos releases:
+  - `alloy` (Deployment): faro.receiver (RUM) + gateway OTLP con
+    memory_limiter → k8sattributes → tail_sampling → batch → Tempo/Prometheus(remote_write con exemplars)/Loki.
+    Una sola réplica a propósito: tail sampling necesita todos los spans de una traza en un proceso.
+  - `alloy-logs` (DaemonSet): tail de stdout de todos los pods → Loki
+    (reemplazó a Promtail/Grafana Agent, ambos EOL)
+- **Synthetic monitoring**: prometheus-blackbox-exporter (job blackbox-http)
+- **Load testing**: Grafana k6 (Job in-cluster, remote write a Prometheus)
 
 ## Microservicios demo
-| Servicio | Lenguaje | Instrumentacion | Ingress |
+| Servicio | Lenguaje | Instrumentación | Ingress |
 |----------|----------|-----------------|---------|
-| Products Service | Node.js 18 (Express) | OTel SDK manual | products.127.0.0.1.nip.io |
-| Orders Service | Python 3.11 (Flask) | OTel SDK manual | orders.127.0.0.1.nip.io |
-| Shipping Service | Java 17 (Spring Boot 3.2) | Beyla eBPF sidecar | shipping.127.0.0.1.nip.io |
+| Products Service | Node.js 22 (Express) | OTel SDK 2.x manual + Pyroscope | products.127.0.0.1.nip.io |
+| Orders Service | Python 3.13 (Flask) | OTel SDK manual | orders.127.0.0.1.nip.io |
+| Shipping Service | Java 21 (Spring Boot 3.5) | OTel Java agent (default) / Beyla eBPF 3.x (opt-in, requiere kernel BTF) | shipping.127.0.0.1.nip.io |
+| Faro Shop (frontend) | nginx + Faro Web SDK (vendored) | Grafana Faro (RUM) + web tracing browser→backend | shop.127.0.0.1.nip.io |
 
 ## Estructura del repo
 ```
-charts/                    # Helm charts para las 3 apps (otel-demo-app, otel-python-app, shipping-service)
+charts/                    # Helm charts: otel-demo-app, otel-python-app, shipping-service, frontend-app
 kind/
-  .kind/config.yaml        # Kind cluster config
-  helmfile.d/              # Helmfile con todos los releases (ingress, prometheus, loki, tempo, grafana, otel-collector)
-  values/                  # Helm values (prometheus.yaml, loki.yaml, tempo.yaml, grafana.yaml, otel-collector.yaml)
-  dashboards/              # 8 ConfigMaps con dashboards Grafana
+  .kind/config.yaml        # Kind cluster config (puertos 80/443 mapeados)
+  helmfile.d/              # Un helmfile con todos los releases (ingress, LGTM+P, alloy x2, blackbox)
+  values/                  # Values por release (alloy, alloy-logs, prometheus, loki, tempo, grafana, pyroscope, blackbox-exporter)
+  dashboards/              # 16 ConfigMaps con dashboards Grafana
 src/
-  otel-app/                # Products Service (index.js + tracing.js)
-  otel-python-app/         # Orders Service (app.py)
-  shipping-service/        # Shipping Service (Java, SIN OTel SDK)
-docs/                      # API.md, BEYLA.md, TROUBLESHOOTING.md, PRODUCTION.md, COST_ANALYSIS.md, etc.
-setup.sh                   # Script principal: crea cluster, despliega todo, genera trafico
-traffic.sh                 # Generador de trafico continuo
+  otel-app/                # Products (Node): index.js + tracing.js (SDK OTel 2.x)
+  otel-python-app/         # Orders (Python): app.py
+  shipping-service/        # Shipping (Java, SIN código OTel; agent baked-in en la imagen)
+  frontend-app/            # Dockerfile nginx + bundles Faro vendored (pineados por ARG)
+docs/                      # API, BEYLA, TROUBLESHOOTING, PRODUCTION, COST_ANALYSIS, IMPROVEMENTS (histórico), VERIFICATION_CHECKLIST
+setup.sh                   # Setup completo: cluster + helmfile + dashboards + apps + tráfico + check
+traffic.sh                 # Generador de tráfico continuo
+incident.sh                # Inyector de incidentes para demos en vivo (errores/latencia + anotaciones)
+check.sh                   # Readiness check: 4 señales + service map + exemplars + plugins + alertas
+k6.sh / k6/load.js         # Load test k6 in-cluster con remote write a Prometheus
+DEMO.md                    # Guion de demo de 12 minutos
+FOR_CTOS.md                # Brief para líderes de ingeniería (costos y trade-offs)
 ```
 
-## Metricas clave disponibles en Prometheus
-- **SDK services**: `http_requests_total` (labels: status_code, method, endpoint, service_name)
-- **SDK histogram**: `http_server_duration_milliseconds_bucket` (latencia)
-- **Beyla**: `http_server_request_duration_seconds_count` / `_bucket` (labels: http_response_status_code, service_name)
+## Métricas clave en Prometheus
+- **SDK services**: `http_requests_total` (labels: http_status_code, method, endpoint, service_name)
+- **SDK histogram**: `http_server_duration_milliseconds_bucket` (latencia en ms)
+- **Java agent / Beyla**: `http_server_request_duration_seconds_count` / `_bucket` (semconv estable, en segundos)
+- **Span metrics (Tempo generator)**: `traces_spanmetrics_*` (label `service`, dimensión `db.system`), `traces_service_graph_*`
+- **Recording rules**: `job:http_errors:*`, `service:http_errors:*` (SLO burn rates, budget 0.001 = SLO 99.9%), `service:apdex:ratio5m` (Apdex T=250ms)
 - **Business**: revenue_at_risk_dollars, transaction_value_dollars, customer_experience_score, orders_created_total
-- **Infra**: cache_hits_total, rate_limited_requests_total, circuit_breaker_state
+- **Synthetic**: probe_success, probe_duration_seconds (blackbox)
+- **k6**: k6_* vía remote write
 
-## 8 Dashboards provisionados
-1. K8S Dashboard
-2. Logs Search
-3. Service Overview (RED metrics)
-4. Distributed Tracing
-5. Log Analysis
-6. Executive Dashboard
-7. Observability Platform Overview
-8. SLO / SLI - Error Budget (uid: slo-sli-error-budget-v1)
+## 16 dashboards provisionados
+Platform Home (landing por defecto), APM (Apdex), Service Time Breakdown,
+Service Overview (RED), Service Map, Distributed Tracing, Continuous Profiling,
+Logs Search, Log Analysis, Executive, Observability Overview, SLO/SLI Error
+Budget, Synthetic Monitoring, Frontend/RUM, k6 Load Testing, K8s Cluster.
+Alertas provisionadas en Grafana (no Alertmanager): error rate, P95, SLO
+fast/slow burn (multi-window), service down, synthetic probe down.
 
-## Cambios realizados en la sesion del 2025-02-10
-
-### Auditoria con 4 skills (devops-engineer, kubernetes-specialist, opentelemetry, grafana-dashboards)
-
-**otel-collector.yaml** - Agregado memory_limiter processor (400MiB limit, 100MiB spike), health_check extension (puerto 13133), batch config explicito (1024 batch size, 5s timeout), resource limits (500m/512Mi). Pipeline order: memory_limiter -> k8sattributes -> batch.
-
-**Deployments de Products y Orders** - Agregados liveness/readiness probes (GET /health), pod securityContext (runAsNonRoot, UID 1001), container securityContext (allowPrivilegeEscalation: false, drop ALL capabilities).
-
-**prometheus.yaml** - Agregados resource limits (500m CPU, 512Mi RAM).
-
-**grafana.yaml** - Agregado tracesToMetrics y serviceMap en Tempo datasource para correlacion completa entre los 3 pilares.
-
-**README.md** - Actualizado conteo de dashboards a 8.
-
-### Dashboard SLO/SLI creado (slo-sli-dashboard.yaml)
-18 paneles: Availability SLI, Error Budget Remaining, Burn Rate, Throughput, timeseries de availability y burn rate con threshold lines, per-service availability y error rate (queries separadas para SDK vs Beyla), P95/P99 latency, request rate stacked, 5xx errors. Variable interactiva: slo_target (99.9%, 99.5%, 99%, 95%).
-
-### Fix Tempo crashloop (problema recurrente)
-**Causa raiz**: Tracing dashboard dispara ~18 queries TraceQL concurrentes. Saturan CPU/RAM de Tempo, no responde a liveness probe, Kubernetes lo mata.
-**Solucion en tempo.yaml**:
-- Recursos: 250m/512Mi requests, 1 CPU/2Gi limits (era 100m/256Mi, 1/1Gi)
-- querier.max_concurrent_queries: 10
-- queryFrontend.search: max_result_limit 50, max_duration 1h
-- server timeouts: 60s read/write
-- Probes: timeoutSeconds 10 (era 5), failureThreshold 5 (era 3), liveness periodSeconds 15 (era 10)
-- NOTA: overrides.defaults.search no funciona en Tempo 2.8.0 (da error "field defaults not found in type overrides.legacyConfig")
+## Decisiones técnicas que hay que conocer
+- Las queries de dashboards/reglas unen DOS familias de métricas HTTP con `or`:
+  la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
+  semconv estable del Java agent (`http_server_request_duration_seconds*`).
+  Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
+- Exemplars: activados vía `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` en las
+  apps y `send_exemplars: true` en el remote write de Alloy; Prometheus corre
+  con `enable-feature=exemplar-storage`.
+- Tempo: `overrides.defaults.metrics_generator.processors` habilita
+  service-graphs, span-metrics y local-blocks. En Tempo 2.8
+  `overrides.defaults.search` NO existe (error "field defaults not found").
+- Tempo crashloop conocido: demasiadas queries TraceQL concurrentes saturan
+  CPU/RAM → mitigado en values (max_concurrent_queries 10, límites de search,
+  probes tolerantes). Si reaparece, revisar kind/values/tempo.yaml.
+- Grafana: los Drilldown apps se instalan con un init container (grafana cli);
+  necesitan egress a grafana.com en el arranque del pod.
+- Beyla es opt-in (`beyla.enabled=true` + `instrumentation.javaAgent.enabled=false`);
+  exactamente UNO de los dos debe estar activo para no duplicar métricas.
+  Beyla 3.x = distro Grafana de OpenTelemetry eBPF Instrumentation (OBI);
+  `BEYLA_SERVICE_NAME` está deprecado, se usa `OTEL_SERVICE_NAME`.
 
 ## Problemas conocidos
-- Beyla sidecar requiere `privileged: true` (necesario para eBPF)
-- Loki gateway da 502 transitorio durante startup (se resuelve solo con retry del collector)
-- Prometheus exporter del collector genera warnings "Instrument description conflict" (informativo, no afecta funcionalidad)
-- `SemanticResourceAttributes` en tracing.js de Node.js esta deprecated (migrar a ATTR_SERVICE_NAME)
-- Python usa `opentelemetry._logs` que es API privada
+- Beyla sidecar requiere `privileged: true` y kernel con BTF (CONFIG_DEBUG_INFO_BTF=y)
+- Loki gateway da 502 transitorio durante startup (se resuelve solo con retry)
+- Los logs del shipping-service llegan a Loki DUPLICADOS (verificado 2026-07):
+  una vez por el DaemonSet de stdout (sin trace_id) y otra por OTLP del Java
+  agent (CON trace_id/span_id). La correlación trace→log de Java funciona por
+  la vía OTLP; falta decidir/filtrar una de las dos vías (Bloque C del informe)
+- Exemplars: solo los produce el metrics-generator de Tempo (span metrics,
+  verificado). El SDK de JS no cablea OTEL_METRICS_EXEMPLAR_FILTER (la env es
+  no-op en Node); las familias que pasan por Alloy no muestran exemplars en
+  Prometheus — pendiente investigar la conversión otelcol.exporter.prometheus
+- Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
-## Mejoras pendientes sugeridas
-- GitHub Actions CI (lint Helm charts, build images, Trivy scan)
-- NetworkPolicies (demo ns solo habla con monitoring ns)
-- ServiceAccounts dedicados para pods de app
-- Tail sampling en el Collector (100% errores, samplear trafico normal)
-- Template variables (service selector) en service-overview dashboard
+## Mejoras pendientes priorizadas (auditoría 2026-07)
+- CI en GitHub Actions: helm lint + kubeconform + shellcheck + promtool +
+  builds + Trivy + e2e (kind + setup.sh + check.sh como gate)
+- GIF del flujo exemplar→trace→log→flame graph y devcontainer/Codespaces en README
+- PostgreSQL real para reemplazar los spans simulados de DB (withPostgres/withRedis/withMongo)
+- Unificar semconv HTTP de los SDK apps con la estable (elimina los `or` en queries)
+- Profiling para Python y Java (hoy solo Node empuja a Pyroscope)
+- Retention en Loki + persistencia para Tempo/Pyroscope
+- NetworkPolicies, securityContext en shipping/frontend, ServiceAccounts dedicados
+- Folders para los 16 dashboards; reemplazar el K8s dashboard genérico (212KB importado)
+- UI de Alloy expuesta por ingress (grafo del pipeline en vivo) y dashboard de meta-monitoring
 
-## Comandos utiles
+## Comandos útiles
 ```bash
 export KUBECONFIG="$PWD/kind/.kube/config"
 ./setup.sh                              # Setup completo desde cero
-./traffic.sh --continuous               # Trafico continuo
-kind delete cluster --name grafana-otel-demo  # Cleanup
+./check.sh                              # Verificar que la demo está lista (4 señales)
+./traffic.sh --continuous --fast        # Tráfico continuo
+./incident.sh -s meltdown -d 600        # Incidente en vivo (errores+latencia)
+./incident.sh --recover                 # Recuperación
+./k6.sh --vus 20 --hold 5m              # Load test k6
 helmfile -f kind/helmfile.d/ apply      # Re-aplicar solo infra
-kubectl get pods -A                     # Ver todos los pods
+kubectl apply -f kind/dashboards/       # Re-aplicar dashboards
+kind delete cluster --name grafana-otel-demo  # Cleanup
 ```
