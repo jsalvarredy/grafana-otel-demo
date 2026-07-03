@@ -33,16 +33,20 @@ server:
   exemplars:
     max_exemplars: 100000
 
+# Subchart toggles. NOTE: since chart v16 the subchart keys are the dependency
+# names (prometheus-pushgateway, prometheus-node-exporter, kube-state-metrics);
+# the old flat keys (pushgateway, nodeExporter, kubeStateMetrics) are silently
+# ignored — with them, the pushgateway ran even though it was "disabled" here.
 alertmanager:
   enabled: false
 
-pushgateway:
-  enabled: false
+prometheus-pushgateway:
+  enabled: false # Not used by the demo (everything is OTLP/remote-write)
 
-nodeExporter:
+prometheus-node-exporter:
   enabled: true # Useful for node metrics
 
-kubeStateMetrics:
+kube-state-metrics:
   enabled: true # Useful for K8s metrics
 
 # ===========================================================================
