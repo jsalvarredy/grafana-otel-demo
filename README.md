@@ -8,6 +8,12 @@
 
 Complete observability with Grafana, Prometheus, Loki, and Tempo. Open source. No per-host licensing. Your data stays in your infrastructure.
 
+<p align="center">
+  <img src="docs/images/dashboards-tour.gif" alt="A tour of the included Grafana dashboards: Platform Home, APM, Service Map, Distributed Tracing, Service Time Breakdown, Log Analysis, Continuous Profiling, Frontend/RUM and SLO/SLI — all running on the demo stack" width="100%">
+  <br>
+  <em>A 25-second tour of the included dashboards, live on the demo stack — metrics, traces, logs, profiles, RUM and SLOs. No SaaS, no per-host licensing.</em>
+</p>
+
 ## Why This Exists
 
 Datadog and NewRelic solve observability well. They also cost $15,000-50,000/year for 50 hosts, send all your telemetry to their cloud, and lock you into their ecosystem.
@@ -246,6 +252,44 @@ Drives a sustained, realistic degradation so the alerts fire and the SLO error
 budget burns on screen — then recovers. It also drops **deploy/incident
 annotations** on the dashboards (a deploy marker and the incident window) so the
 timeline tells the story by itself. Pairs with the [DEMO.md](DEMO.md) script.
+
+## What it looks like
+
+Real screenshots from the running demo stack — every panel is live data from the
+instrumented services, not mockups. Click any image to view it full size.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/apm.png"><img src="docs/images/apm.png" alt="APM dashboard: Apdex, response time, throughput and error rate"></a>
+<b>APM</b> — Apdex, response time, throughput and error rate per service, New Relic-style.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/service-map.png"><img src="docs/images/service-map.png" alt="Service Map: live dependency graph"></a>
+<b>Service Map</b> — live dependency graph, built automatically from traces.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/tracing.png"><img src="docs/images/tracing.png" alt="Distributed Tracing dashboard"></a>
+<b>Distributed Tracing</b> — span throughput, latency heatmap and trace search on Tempo.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/service-breakdown.png"><img src="docs/images/service-breakdown.png" alt="Service Time Breakdown dashboard"></a>
+<b>Service Time Breakdown</b> — response time split into App / PostgreSQL / Redis / External.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/profiling.png"><img src="docs/images/profiling.png" alt="Continuous Profiling flame graph"></a>
+<b>Continuous Profiling</b> — CPU / wall flame graphs from Pyroscope.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/rum.png"><img src="docs/images/rum.png" alt="Frontend / RUM dashboard"></a>
+<b>Frontend / RUM</b> — Core Web Vitals, JS errors and full-stack browser-to-backend traces.
+</td>
+</tr>
+</table>
 
 ## Documentation
 
