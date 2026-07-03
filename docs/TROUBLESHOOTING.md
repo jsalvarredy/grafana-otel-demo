@@ -48,17 +48,21 @@ kubectl port-forward -n monitoring svc/grafana 3000:80
 
 ## No Data in Dashboards
 
-### 1. Check OpenTelemetry Collector
+### 1. Check Grafana Alloy (telemetry pipeline)
+
+Two Alloy releases run in the cluster: `alloy` (the OTLP/Faro gateway,
+a Deployment) and `alloy-logs` (the node log collector, a DaemonSet).
 
 ```bash
-kubectl get pods -n monitoring | grep otel-collector
-kubectl logs -n monitoring -l app.kubernetes.io/name=opentelemetry-collector
+kubectl get pods -n monitoring | grep alloy
+kubectl logs -n monitoring deployment/alloy --tail=50
+kubectl logs -n monitoring -l app.kubernetes.io/instance=alloy-logs --tail=50
 ```
 
 ### 2. Generate Traffic
 
 ```bash
-./quick-traffic.sh
+./traffic.sh --iterations 50
 ```
 
 ### 3. Check Service Logs
@@ -85,7 +89,8 @@ kubectl logs -n monitoring -l app.kubernetes.io/name=tempo
 
 ### 2. Verify OTLP Receiver
 
-The collector should be receiving traces on port 4317 (gRPC) or 4318 (HTTP).
+Alloy should be receiving traces on port 4317 (gRPC) or 4318 (HTTP) of the
+`alloy` Service in the `monitoring` namespace.
 
 ### 3. Check Trace Context Propagation
 

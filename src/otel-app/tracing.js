@@ -1,5 +1,7 @@
 // OpenTelemetry SDK initialization
-// This file configures traces, metrics, and logs exporters for Grafana Stack
+// This file configures traces, metrics, and logs exporters for Grafana Stack.
+// Written against the OpenTelemetry JS SDK 2.x API (resourceFromAttributes,
+// NodeSDK-managed logger provider).
 
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
@@ -7,9 +9,8 @@ const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http')
 const { OTLPMetricExporter } = require('@opentelemetry/exporter-metrics-otlp-http');
 const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
-const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
-const { logs } = require('@opentelemetry/api-logs');
-const { Resource } = require('@opentelemetry/resources');
+const { BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+const { resourceFromAttributes } = require('@opentelemetry/resources');
 const {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -37,31 +38,35 @@ const logExporter = new OTLPLogExporter({
 // service.namespace / deployment.environment use stable string keys; the
 // dedicated semconv constants for these moved across versions, so plain keys
 // keep this forward-compatible.
-const resource = new Resource({
+const resource = resourceFromAttributes({
   [ATTR_SERVICE_NAME]: 'products-service',
   [ATTR_SERVICE_VERSION]: '2.0.0',
   'service.namespace': 'demo',
   'deployment.environment': 'demo',
 });
 
-// Initialize Logger Provider for logs
-const loggerProvider = new LoggerProvider({ resource });
-loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
-logs.setGlobalLoggerProvider(loggerProvider);
-
-// Initialize OpenTelemetry SDK with all exporters.
-// NOTE: exemplars are enabled via OTEL_METRICS_EXEMPLAR_FILTER=trace_based
-// (set in the Helm chart env). With exemplars on, every histogram sample can
-// carry the trace_id of an in-flight request, which is what powers the
-// "jump from a latency spike straight to the trace" experience in Grafana.
+// Initialize OpenTelemetry SDK with all exporters. The NodeSDK owns the
+// logger provider and registers it globally on start(), so index.js can get
+// its logger through @opentelemetry/api-logs and all three signals share the
+// same resource and the same shutdown path.
+// NOTE on exemplars: the JS SDK ships the exemplar classes but (unlike
+// Java/Python) does NOT wire OTEL_METRICS_EXEMPLAR_FILTER yet, so this app's
+// own histograms carry no exemplars. The metric -> trace "jump to the exact
+// trace" experience in Grafana is powered by the span metrics that Tempo's
+// metrics-generator writes to Prometheus with send_exemplars: true (see
+// kind/values/tempo.yaml) - that path is verified end to end.
 const sdk = new NodeSDK({
   resource,
   traceExporter,
-  metricReader: new PeriodicExportingMetricReader({
-    exporter: metricExporter,
-    exportIntervalMillis: 10000, // Export metrics every 10 seconds
-  }),
-  logRecordProcessor: new BatchLogRecordProcessor(logExporter),
+  metricReaders: [
+    new PeriodicExportingMetricReader({
+      exporter: metricExporter,
+      exportIntervalMillis: 10000, // Export metrics every 10 seconds
+    }),
+  ],
+  // sdk-logs 0.2xx: processors take an options object ({ exporter }), not the
+  // exporter positionally.
+  logRecordProcessors: [new BatchLogRecordProcessor({ exporter: logExporter })],
   instrumentations: [
     getNodeAutoInstrumentations({
       // Express/HTTP auto-instrumentation creates the active server span that
@@ -110,13 +115,11 @@ if (pyroscopeServer) {
   }
 }
 
-// Graceful shutdown
+// Graceful shutdown. sdk.shutdown() flushes traces, metrics AND logs (the
+// NodeSDK owns the logger provider since the SDK 2.x migration).
 process.on('SIGTERM', () => {
   sdk.shutdown()
-    .then(() => {
-      loggerProvider.shutdown();
-      console.log(JSON.stringify({ message: 'OpenTelemetry SDK terminated' }));
-    })
+    .then(() => console.log(JSON.stringify({ message: 'OpenTelemetry SDK terminated' })))
     .catch((error) => console.log(JSON.stringify({ message: 'Error terminating SDK', error: error.message })))
     .finally(() => process.exit(0));
 });

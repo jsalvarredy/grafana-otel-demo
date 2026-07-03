@@ -1,5 +1,11 @@
 # On-Premise Observability Stack
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.33-326CE5?logo=kubernetes&logoColor=white)](kind/.kind/config.yaml)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-native-425CC7?logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-13-F46800?logo=grafana&logoColor=white)](https://grafana.com/oss/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Complete observability with Grafana, Prometheus, Loki, and Tempo. Open source. No per-host licensing. Your data stays in your infrastructure.
 
 ## Why This Exists
@@ -62,7 +68,58 @@ See [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) for detailed breakdown.
 
 ## Architecture
 
-![Architecture](docs/Architecture.jpg)
+```mermaid
+flowchart LR
+    subgraph browser["Browser"]
+        FARO["Faro Shop SPA<br/>Grafana Faro RUM"]
+    end
+
+    subgraph demo["Demo services (ns: demo)"]
+        FE["Frontend nginx<br/>same-origin /api proxy"]
+        P["Products · Node.js<br/>OTel SDK"]
+        O["Orders · Python<br/>OTel SDK"]
+        S["Shipping · Java<br/>OTel Java agent, zero code"]
+    end
+
+    subgraph pipeline["Telemetry pipeline (ns: monitoring)"]
+        A["Grafana Alloy · gateway<br/>faro.receiver + OTLP<br/>k8sattributes → tail sampling"]
+        AL["Grafana Alloy · DaemonSet<br/>pod stdout log tailing"]
+        BB["Blackbox exporter<br/>synthetic probes"]
+    end
+
+    subgraph storage["Storage backends"]
+        PR["Prometheus<br/>metrics + exemplars"]
+        L["Loki<br/>logs"]
+        T["Tempo<br/>traces"]
+        PY["Pyroscope<br/>profiles"]
+    end
+
+    G["Grafana<br/>16 dashboards · alerting · Drilldown"]
+
+    FARO -- "RUM + browser traces" --> A
+    FARO --> FE
+    FE -- "/api/*" --> P
+    FE -- "/api/*" --> O
+    O -- "HTTP + trace context" --> P
+    P -- OTLP --> A
+    O -- OTLP --> A
+    S -- OTLP --> A
+    P -- profiles --> PY
+    A -- "remote_write (exemplars)" --> PR
+    A -- "OTLP logs" --> L
+    A -- traces --> T
+    AL -- logs --> L
+    T -- "span metrics + service graph" --> PR
+    BB -. "probes /health" .-> demo
+    G --> PR
+    G --> L
+    G --> T
+    G --> PY
+```
+
+The same load can also be driven by an in-cluster **k6** Job
+(`./k6.sh`), which remote-writes its own metrics to Prometheus while
+exercising the instrumented services.
 
 ## This is a Demo
 
@@ -85,7 +142,10 @@ For production deployment guidance, see [docs/PRODUCTION.md](docs/PRODUCTION.md)
 - **Prometheus** - Metrics collection and alerting
 - **Loki** - Log aggregation
 - **Tempo** - Distributed tracing
-- **OpenTelemetry Collector** - Telemetry pipeline
+- **Pyroscope** - Continuous profiling (flame graphs)
+- **Grafana Alloy** - Unified telemetry pipeline: OTLP gateway with tail
+  sampling, Faro (RUM) receiver, and node-level log collection
+- **Blackbox exporter** - Synthetic / uptime probes
 
 ### Demo Applications
 - **Products Service** (Node.js) - Catalog, search, inventory
@@ -198,8 +258,11 @@ timeline tells the story by itself. Pairs with the [DEMO.md](DEMO.md) script.
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 | [docs/PRODUCTION.md](docs/PRODUCTION.md) | Production deployment guide |
 | [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) | Detailed cost comparison |
-| [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | APM and metrics improvements log |
+| [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | APM and metrics improvements log (historical) |
 | [docs/VERIFICATION_CHECKLIST.md](docs/VERIFICATION_CHECKLIST.md) | Metrics verification checklist |
+| [CHANGELOG.md](CHANGELOG.md) | Notable changes per release |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute and validate changes |
+| [SECURITY.md](SECURITY.md) | Security policy and what's demo-by-design |
 
 ## Requirements
 

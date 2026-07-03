@@ -233,9 +233,9 @@ Access: **Grafana → Dashboards → Executive Dashboard - Business Metrics**
 **Check 1:** Time range in Grafana
 - [ ] Set to "Last 15 minutes" or "Last 1 hour"
 
-**Check 2:** OTEL Collector logs
+**Check 2:** Grafana Alloy (OTLP gateway) logs
 ```bash
-kubectl logs -n monitoring deployment/otel-collector-opentelemetry-collector --tail=50 | grep -i error
+kubectl logs -n monitoring deployment/alloy --tail=50 | grep -i error
 ```
 - [ ] No "duplicate label" errors
 - [ ] No "failed to convert metric" errors
@@ -249,9 +249,7 @@ kubectl get pods -n demo
 
 **Check 4:** Generate more traffic
 ```bash
-./generate-traffic.sh
-# or
-./quick-traffic.sh
+./traffic.sh --iterations 50
 ```
 - [ ] Wait 30 seconds
 - [ ] Refresh Grafana
@@ -261,8 +259,8 @@ kubectl get pods -n demo
 kubectl port-forward -n monitoring svc/prometheus-server 9090:80
 # Open http://localhost:9090/targets
 ```
-- [ ] otel-collector target is UP
-- [ ] No scraping errors
+- [ ] Prometheus targets are UP (metrics arrive via Alloy remote write, not scraping)
+- [ ] No scraping errors on the blackbox-http job
 
 ---
 
@@ -296,7 +294,7 @@ kubectl port-forward -n monitoring svc/prometheus-server 9090:80
 2. Executive Dashboard shows data in > 80% of panels
 3. Service Overview Dashboard shows non-zero values
 4. Traces link to logs (trace_id correlation works)
-5. No errors in OTEL Collector logs
+5. No errors in Grafana Alloy logs
 
 ---
 

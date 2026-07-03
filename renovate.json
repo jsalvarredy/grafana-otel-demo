@@ -1,0 +1,58 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Keeps the demo honest: Helm charts, container images, language deps and pinned tool versions all get update PRs. Enable the Renovate GitHub App on this repo for it to take effect.",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "labels": ["dependencies"],
+  "timezone": "America/Argentina/Buenos_Aires",
+  "helmfile": {
+    "managerFilePatterns": ["/(^|/)kind/helmfile\\.d/.+\\.ya?ml$/"]
+  },
+  "packageRules": [
+    {
+      "description": "All OpenTelemetry JS packages move together (SDK + exporters + instrumentations)",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@opentelemetry/**"],
+      "groupName": "opentelemetry-js"
+    },
+    {
+      "description": "Group minor/patch Helm chart bumps into one PR",
+      "matchManagers": ["helmfile"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "helm-charts (minor/patch)"
+    },
+    {
+      "description": "Major Helm chart bumps stay individual PRs (they usually need values review)",
+      "matchManagers": ["helmfile"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Versions annotated with a `# renovate:` marker (YAML values and Dockerfile ARGs)",
+      "managerFilePatterns": ["/.*/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)( extractVersion=(?<extractVersion>\\S+))?\\n\\s*(?:ARG )?[A-Za-z_.]+\\s*[:=]\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Kind node image",
+      "managerFilePatterns": ["/(^|/)kind/\\.kind/config\\.yaml$/"],
+      "matchStrings": ["image: (?<depName>kindest/node):(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Inline container image references (k6 job image, Grafana plugin-install init container)",
+      "managerFilePatterns": ["/(^|/)k6\\.sh$/", "/(^|/)kind/values/grafana\\.yaml$/"],
+      "matchStrings": ["(?<depName>grafana/(?:k6|grafana)):(?<currentValue>[\\d][\\d.]*)"],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}

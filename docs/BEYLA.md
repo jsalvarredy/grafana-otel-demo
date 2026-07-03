@@ -29,6 +29,13 @@ This document explains how Grafana's **Beyla** auto-instruments the Shipping Ser
 - Add SDKs or instrumentation libraries
 - Recompile the application
 
+> **Beyla and OpenTelemetry (OBI).** Grafana donated the Beyla core to the
+> OpenTelemetry project, where it lives on as **OpenTelemetry eBPF
+> Instrumentation (OBI)**. Beyla 3.x — the version pinned in this demo
+> (`charts/shipping-service/values.yaml`) — is Grafana's distribution built on
+> OBI. This matters for the story this repo tells: even the eBPF
+> auto-instrumentation path is an open standard, not a vendor agent.
+
 ## How it works
 
 Beyla runs as a **sidecar** alongside the application and uses eBPF to:
@@ -49,15 +56,15 @@ Beyla runs as a **sidecar** alongside the application and uses eBPF to:
 │  │  - No OTEL SDK      │◄──┤  - Captures HTTP/gRPC   │ │
 │  │  - Vanilla code      │   │  - Generates traces     │ │
 │  │  - Business logic    │   │  - Generates RED metrics│ │
-│  │    only              │   │  - Sends to OTEL Col.   │ │
+│  │    only              │   │  - Sends OTLP to Alloy  │ │
 │  └──────────────────────┘   └─────────────────────────┘ │
 │                                        │                │
 └────────────────────────────────────────│────────────────┘
                                          │
                                          ▼
                               ┌──────────────────────┐
-                              │  OTEL Collector      │
-                              │  (traces & metrics)  │
+                              │  Grafana Alloy       │
+                              │  (OTLP gateway)      │
                               └──────────────────────┘
 ```
 
@@ -75,8 +82,8 @@ Beyla runs as a **sidecar** alongside the application and uses eBPF to:
 
 ```
 ┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-│  Orders Service  │ HTTP │  Shipping Svc    │      │  OTEL Collector  │
-│  (OTEL SDK)      │─────►│  (Beyla eBPF)    │      │                  │
+│  Orders Service  │ HTTP │  Shipping Svc    │      │  Grafana Alloy   │
+│  (OTEL SDK)      │─────►│  (Beyla eBPF)    │      │  (OTLP gateway)  │
 │                  │      │                  │      │                  │
 │  span: create    │      │  span: POST      │      │                  │
 │    └─ span:      │      │  /api/shipping   │      │                  │
@@ -100,13 +107,14 @@ env:
   - name: BEYLA_OPEN_PORT
     value: "8080"
 
-  # Service name for traces
-  - name: BEYLA_SERVICE_NAME
+  # Service name for traces (BEYLA_SERVICE_NAME is deprecated since 2.x;
+  # the standard OTEL_SERVICE_NAME is the supported form)
+  - name: OTEL_SERVICE_NAME
     value: "shipping-service"
 
-  # OTEL Collector endpoint
+  # Grafana Alloy (OTLP gateway) endpoint
   - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: "http://otel-collector:4318"
+    value: "http://alloy.monitoring.svc.cluster.local:4318"
 
   # OTLP protocol
   - name: OTEL_EXPORTER_OTLP_PROTOCOL
@@ -209,4 +217,5 @@ curl http://shipping.127.0.0.1.nip.io/api/health
 
 - [Beyla GitHub](https://github.com/grafana/beyla)
 - [Beyla Documentation](https://grafana.com/docs/beyla/latest/)
+- [OpenTelemetry eBPF Instrumentation (OBI)](https://github.com/open-telemetry/opentelemetry-ebpf-instrumentation)
 - [eBPF.io](https://ebpf.io/)

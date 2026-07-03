@@ -107,7 +107,7 @@ data:
       </div>
       <pre id="log"></pre>
       <p class="muted">Open the <strong>Frontend / RUM</strong> dashboard in Grafana to see the data flow in.</p>
-      <!-- Faro bundles vendored same-origin (pinned 1.19.0, baked into the image at /vendor). No CDN egress from the browser. -->
+      <!-- Faro bundles vendored same-origin (pinned via build ARG in src/frontend-app/Dockerfile, baked into the image at /vendor). No CDN egress from the browser. -->
       <!-- Loaded synchronously and in order; startFaro() runs once BOTH are ready. -->
       <script src="/vendor/faro-web-sdk.iife.js"></script>
       <script src="/vendor/faro-web-tracing.iife.js"></script>

@@ -51,16 +51,21 @@ instrumentation:
 # OPT-IN instrumentation: Beyla eBPF sidecar. Requires a BTF-enabled kernel.
 # If you enable this, set instrumentation.javaAgent.enabled=false to avoid
 # emitting duplicate HTTP metrics from both the agent and Beyla.
+# Beyla 3.x is Grafana's distribution of OpenTelemetry eBPF Instrumentation
+# (OBI) - Grafana donated the Beyla core to the OpenTelemetry project. The
+# BEYLA_* env vars in the sidecar remain supported; service identity comes
+# from OTEL_SERVICE_NAME (BEYLA_SERVICE_NAME is deprecated in 2.x+).
 beyla:
   enabled: false
   image:
     repository: grafana/beyla
-    tag: "1.8.4"
+    # renovate: datasource=docker depName=grafana/beyla
+    tag: "3.24.0"
   # Target the Java application by port
   openPort: 8080
   # Service name for telemetry
   serviceName: "shipping-service"
-  # OTEL Collector endpoint
+  # Grafana Alloy (OTLP gateway) endpoint
   otelEndpoint: "http://alloy.monitoring.svc.cluster.local:4318"
 
 # Extra environment variables for the app container (merged with the agent vars).

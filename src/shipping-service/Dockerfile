@@ -1,4 +1,4 @@
-# Shipping Service Dockerfile (Java 17 / Spring Boot)
+# Shipping Service Dockerfile (Java 21 / Spring Boot)
 #
 # Observability: this image bakes in the OpenTelemetry Java agent (bytecode
 # auto-instrumentation, ZERO application code changes) so the service emits
@@ -10,7 +10,7 @@
 # of the two enabled to avoid double-counting HTTP metrics.
 
 # Build stage
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
 # Copy pom.xml and download dependencies
@@ -22,13 +22,14 @@ COPY src ./src
 RUN mvn package -DskipTests -B
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
 # OpenTelemetry Java agent. Pinned for reproducibility and baked into the image
 # so the demo works offline (no download at pod start). Activated only when
 # instrumentation.javaAgent.enabled=true (default) in the Helm chart.
+# renovate: datasource=github-releases depName=open-telemetry/opentelemetry-java-instrumentation extractVersion=^v(?<version>.*)$
 ARG OTEL_AGENT_VERSION=2.29.0
 ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
 

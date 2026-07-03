@@ -216,7 +216,7 @@ helm upgrade --install otel-python-app charts/otel-python-app \
   --wait --timeout 3m > /dev/null 2>&1
 print_success "Orders Service deployed"
 
-print_step "Deploying Shipping Service (with Beyla eBPF sidecar)..."
+print_step "Deploying Shipping Service (OTel Java agent; Beyla optional)..."
 helm upgrade --install shipping-service charts/shipping-service \
   --set image.repository=shipping-service \
   --set image.tag=latest \
