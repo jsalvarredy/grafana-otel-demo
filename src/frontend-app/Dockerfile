@@ -7,8 +7,10 @@
 # still provided by the Helm ConfigMap (mounted via subPath, which does not
 # hide the /vendor directory baked in here).
 
-ARG FARO_SDK_VERSION=1.19.0
-ARG FARO_TRACING_VERSION=1.19.0
+# renovate: datasource=npm depName=@grafana/faro-web-sdk
+ARG FARO_SDK_VERSION=2.8.2
+# renovate: datasource=npm depName=@grafana/faro-web-tracing
+ARG FARO_TRACING_VERSION=2.8.2
 
 # Stage 1: fetch the pinned Faro bundles (build-time egress to unpkg only).
 FROM alpine:3.20 AS fetch

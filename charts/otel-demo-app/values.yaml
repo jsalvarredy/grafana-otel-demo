@@ -25,7 +25,7 @@ resources:
     memory: 128Mi
 
 env:
-  # OTEL Collector endpoint
+  # Grafana Alloy (OTLP gateway) endpoint
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
   # Attach trace exemplars to histogram samples so Grafana can jump
   # from a latency spike straight to the matching trace in Tempo.

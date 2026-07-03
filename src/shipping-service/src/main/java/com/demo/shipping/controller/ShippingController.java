@@ -32,8 +32,8 @@ public class ShippingController {
         Map<String, Object> info = new HashMap<>();
         info.put("service", "shipping-service");
         info.put("version", "1.0.0");
-        info.put("instrumentation", "Beyla eBPF (no SDK)");
-        info.put("description", "Shipping service auto-instrumented by Beyla without any code changes");
+        info.put("instrumentation", "OpenTelemetry Java agent (default) / Beyla eBPF (opt-in) - no SDK");
+        info.put("description", "Shipping service auto-instrumented with zero application code changes");
         info.put("endpoints", new String[]{
             "POST /api/shipping/quote - Get shipping quote",
             "POST /api/shipping/create - Create shipment",
@@ -47,7 +47,7 @@ public class ShippingController {
     public ResponseEntity<ShippingQuote> getShippingQuote(@RequestBody ShippingRequest request) {
         logger.info("Calculating shipping quote for order: {}", request.getOrderId());
 
-        // Simulate occasional errors (Beyla will capture these as error metrics)
+        // Simulate occasional errors (captured as error metrics by the auto-instrumentation)
         if (random.nextInt(20) == 0) {
             logger.error("Failed to calculate shipping quote - external service unavailable");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
@@ -116,7 +116,7 @@ public class ShippingController {
         return health;
     }
 
-    // Endpoint to simulate slow responses (for testing Beyla latency metrics)
+    // Endpoint to simulate slow responses (for testing latency metrics)
     @GetMapping("/slow")
     public Map<String, Object> slowEndpoint() throws InterruptedException {
         int delay = 1000 + random.nextInt(2000);
@@ -129,13 +129,13 @@ public class ShippingController {
         return response;
     }
 
-    // Endpoint to simulate errors (for testing Beyla error metrics)
+    // Endpoint to simulate errors (for testing error metrics)
     @GetMapping("/error")
     public ResponseEntity<Map<String, String>> errorEndpoint() {
         logger.error("Intentional error endpoint called");
         Map<String, String> error = new HashMap<>();
         error.put("error", "Intentional error for testing");
-        error.put("message", "This endpoint always returns 500 to test Beyla error tracking");
+        error.put("message", "This endpoint always returns 500 to test error tracking");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }

@@ -100,12 +100,11 @@ spec:
             # Target the application by open port
             - name: BEYLA_OPEN_PORT
               value: "{{ .Values.beyla.openPort }}"
-            # Service name for traces and metrics (both BEYLA and OTEL variables)
-            - name: BEYLA_SERVICE_NAME
-              value: "{{ .Values.beyla.serviceName }}"
+            # Service name for traces and metrics. OTEL_SERVICE_NAME is the
+            # supported form (BEYLA_SERVICE_NAME was deprecated in Beyla 2.x+).
             - name: OTEL_SERVICE_NAME
               value: "{{ .Values.beyla.serviceName }}"
-            # OTEL exporter configuration - send to OTEL Collector
+            # OTEL exporter configuration - send to Grafana Alloy (OTLP gateway)
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "{{ .Values.beyla.otelEndpoint }}"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
