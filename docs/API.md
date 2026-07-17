@@ -97,11 +97,11 @@ curl "http://orders.127.0.0.1.nip.io/api/stats"
 
 ---
 
-## Shipping Service (Java + Beyla eBPF)
+## Shipping Service (Java + OTel Java agent)
 
 Base URL: `http://shipping.127.0.0.1.nip.io`
 
-This service has **no OTEL SDK**. All telemetry (traces and metrics) is captured automatically by a Beyla eBPF sidecar.
+This service has **no OTEL SDK in its code**. All telemetry (traces and metrics) is captured automatically by the OpenTelemetry Java agent baked into the image (zero-code instrumentation). An eBPF alternative via Beyla is available as an opt-in (`beyla.enabled=true`, requires a BTF-enabled kernel) — see [BEYLA.md](BEYLA.md).
 
 ### Endpoints
 
