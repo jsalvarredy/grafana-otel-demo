@@ -123,11 +123,11 @@ req() {
 }
 
 # --------------------------------------------------------------------------
-# Grafana annotation - draws the story on the dashboards (deploy marker / a
-# region for the incident window). Point annotation if no end time is given,
-# region if one is. Best-effort; never aborts the run.
-# Dashboards show these via the "Deploys & Incidents" annotation query
-# (tags: deploy / incident).
+# Grafana annotation - draws incident/recovery context on every dashboard.
+# Real releases are emitted exclusively by setup.sh / deploy-observe.sh.
+# Point annotation if no end time is given, region if one is. Best-effort;
+# never aborts the run. Dashboards expose separate Deployments, Incidents and
+# Recoveries toggles (tags: deployment / incident / recovery).
 # --------------------------------------------------------------------------
 grafana_annotation() {
   local text="$1" tags_csv="$2" time_ms="$3" end_ms="${4:-}"
@@ -229,6 +229,9 @@ cleanup() {
   for pid in "${PIDS[@]:-}"; do kill "$pid" 2>/dev/null || true; done
   wait 2>/dev/null || true
   if [[ "$RECOVER" != true ]]; then
+    local actual_end_ms=$(( $(date +%s) * 1000 ))
+    grafana_annotation "Incident simulation: ${SCENARIO} on ${targets[*]}" \
+      "incident,simulation,scenario:${SCENARIO}" "$INCIDENT_START_MS" "$actual_end_ms"
     echo -e "${CYAN}Tip:${NC} run ${BOLD}./incident.sh --recover${NC} to send healthy-only"
     echo -e "      traffic and watch the alerts resolve back to OK."
   fi
@@ -259,19 +262,31 @@ echo ""
 END_TS=$(( $(date +%s) + DURATION ))
 
 # --------------------------------------------------------------------------
-# Tell the story on the dashboards with annotations.
+# Tell the story on the dashboards with semantically honest annotations.
+# This script injects traffic only: it never claims that a real deploy/rollback
+# happened. Real releases are recorded by setup.sh / deploy-observe.sh.
 # --------------------------------------------------------------------------
 NOW_MS=$(( $(date +%s) * 1000 ))
+INCIDENT_START_MS="$NOW_MS"
 if [[ "$RECOVER" == true ]]; then
-  grafana_annotation "Rollback / hotfix deployed - recovering" "deploy,recovery" "$NOW_MS"
+  grafana_annotation "Recovery traffic started after incident simulation" "recovery,simulation" "$NOW_MS"
 else
-  grafana_annotation "Deployed ${targets[*]} - release with a latent regression" "deploy,release" "$NOW_MS"
-  grafana_annotation "Incident: ${SCENARIO} on ${targets[*]}" "incident,${SCENARIO}" "$NOW_MS" "$(( NOW_MS + DURATION * 1000 ))"
+  # Point marker is visible immediately. cleanup() adds the real-duration region
+  # when the run finishes or is interrupted.
+  grafana_annotation "Incident simulation started: ${SCENARIO} on ${targets[*]}" \
+    "incident,simulation,scenario:${SCENARIO}" "$NOW_MS"
 fi
 echo ""
 
 # Arm cleanup now that we are about to spawn background workers.
-trap cleanup INT TERM EXIT
+on_signal() {
+  local exit_code="$1"
+  cleanup
+  exit "$exit_code"
+}
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
+trap cleanup EXIT
 
 # --------------------------------------------------------------------------
 # Launch workers

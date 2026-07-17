@@ -21,7 +21,7 @@ kind/
 │   ├── prometheus.yaml           # Remote-write receiver, exemplars, SLO/Apdex rules
 │   ├── pyroscope.yaml            # Continuous profiling backend
 │   └── tempo.yaml                # Local storage + metrics generator (span metrics)
-├── dashboards/                   # 16 Grafana dashboards as ConfigMaps
+├── dashboards/                   # 17 Grafana dashboards as ConfigMaps
 └── .kube/                        # Generated KUBECONFIG (auto-created)
 ```
 

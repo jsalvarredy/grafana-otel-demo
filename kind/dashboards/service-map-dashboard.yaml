@@ -8,7 +8,76 @@ metadata:
 data:
   service-map.json: |
     {
-      "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#5794F2",
+            "name": "Deployments",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "deployment"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#F2495C",
+            "name": "Incidents",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "incident"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#73BF69",
+            "name": "Recoveries",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "recovery"
+              ],
+              "type": "tags"
+            }
+          }
+        ]
+      },
       "description": "APM Service Map and dependencies, built from Tempo's metrics generator (traces_service_graph_*). Who calls whom, with request rate, latency and errors on every edge.",
       "editable": true,
       "graphTooltip": 1,

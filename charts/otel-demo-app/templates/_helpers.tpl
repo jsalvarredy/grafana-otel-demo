@@ -31,14 +31,24 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Bounded release labels shared by the Deployment and Pod template. Full commit,
+deployment ID and timestamps are annotations to avoid label cardinality.
+*/}}
+{{- define "otel-demo-app.observabilityLabels" -}}
+app.kubernetes.io/version: {{ .Values.observability.version | default .Chart.AppVersion | quote }}
+app.kubernetes.io/component: {{ .Values.observability.component | quote }}
+app.kubernetes.io/part-of: {{ .Values.observability.partOf | quote }}
+observability.grafana.com/service-name: {{ .Values.observability.serviceName | quote }}
+observability.grafana.com/environment: {{ .Values.observability.environment | quote }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "otel-demo-app.labels" -}}
 helm.sh/chart: {{ include "otel-demo-app.chart" . }}
 {{ include "otel-demo-app.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
+{{ include "otel-demo-app.observabilityLabels" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 

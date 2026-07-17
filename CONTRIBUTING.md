@@ -22,7 +22,7 @@ Tear down with `kind delete cluster --name grafana-otel-demo`.
 | Path | What lives there |
 |------|------------------|
 | `kind/helmfile.d/` + `kind/values/` | Every infra release (ingress, LGTM+P stack, Alloy, blackbox) |
-| `kind/dashboards/` | 16 Grafana dashboards as ConfigMaps |
+| `kind/dashboards/` | 17 Grafana dashboards as ConfigMaps |
 | `charts/` | Helm charts for the 4 demo apps |
 | `src/` | App code: Node (OTel SDK 2.x), Python (OTel SDK), Java (no OTel code — Java agent), frontend (Faro) |
 | `docs/` | Guides; `DEMO.md` is the 12-minute live-demo script |
@@ -33,7 +33,9 @@ Run the same validations CI will run (and reviewers will ask for):
 
 ```bash
 helm lint charts/*                                   # chart sanity
-shellcheck setup.sh traffic.sh incident.sh check.sh k6.sh
+shellcheck setup.sh traffic.sh incident.sh check.sh k6.sh deploy-observe.sh deployment-snapshot.sh
+./deploy-observe.sh --service test-service --version test-1 \
+  --status succeeded --dry-run                       # JSON/API payload sanity
 docker build src/otel-app && docker build src/otel-python-app \
   && docker build src/shipping-service && docker build src/frontend-app
 # If you touched recording rules in kind/values/prometheus.yaml:

@@ -100,7 +100,7 @@ flowchart LR
         PY["Pyroscope<br/>profiles"]
     end
 
-    G["Grafana<br/>16 dashboards · alerting · Drilldown"]
+    G["Grafana<br/>17 dashboards · alerting · Drilldown"]
 
     FARO -- "RUM + browser traces" --> A
     FARO --> FE
@@ -174,8 +174,9 @@ opt-in to showcase kernel-level auto-instrumentation where BTF is available.
 
 See [docs/BEYLA.md](docs/BEYLA.md) for a deep dive on Beyla and when to use each approach.
 
-### Pre-built Dashboards (16 included)
+### Pre-built Dashboards (17 included)
 - Platform Home (landing page: golden signals + deep links to every view)
+- Deployment Health (real release annotations, unique release identity, rollout status and historical-offset comparison)
 - APM (New Relic-style single pane: Apdex, response time, throughput, error rate + per-transaction table)
 - Service Time Breakdown (New Relic-style transaction breakdown: response time split per service into App / PostgreSQL / Redis / MongoDB / External)
 - Service Overview (RED metrics)
@@ -222,6 +223,34 @@ same origin, the OpenTelemetry web tracing **propagates the trace from the
 browser into the services** — a single trace from a click in the browser through
 `orders` and `products`. Real User Monitoring plus full-stack tracing, no SaaS.
 
+### Deployment Observability
+
+Every `setup.sh` run generates a unique release tag by default and records a **real Grafana
+deployment annotation** with services, version, Git revision, environment,
+actor, result and actual duration. The same version is attached to Kubernetes
+Deployments/Pods, backend `service.version` and Faro `app.version`, so the blue
+marker on a graph identifies the exact code that started running there.
+
+Open **Deployment Health** to see rollout readiness, image digests, restarts,
+synthetic probes and current-versus-historical-offset throughput, error rate,
+P95 and Apdex (the first clean run has no older app series yet). For CI/CD or
+GitOps, call the reusable script directly:
+
+```bash
+GRAFANA_TOKEN="$TOKEN" ./deploy-observe.sh \
+  --service products-service --version "$VERSION" \
+  --revision "$GIT_SHA" --environment production --status succeeded
+```
+
+Each successful local setup also writes an atomic, checksummed evidence bundle to
+`artifacts/deployments/<deployment-id>/`: the deployment event, Kubernetes and
+Helm state, image IDs, matching Grafana annotation/dashboard/alert rules, and
+post-deploy throughput, error ratio, P95, Apdex, probes and restarts. These
+runtime snapshots are ignored by Git and are intended for CI artifact storage.
+
+See [docs/DEPLOYMENT_OBSERVABILITY.md](docs/DEPLOYMENT_OBSERVABILITY.md) for the
+CI contract, snapshot contents, authentication and cardinality guardrails.
+
 ### Traffic Generator
 ```bash
 ./traffic.sh                     # Run 50 iterations
@@ -249,9 +278,10 @@ also drives the RED dashboards, traces and the service map.
 ./incident.sh --recover          # healthy traffic to clear the alerts
 ```
 Drives a sustained, realistic degradation so the alerts fire and the SLO error
-budget burns on screen — then recovers. It also drops **deploy/incident
-annotations** on the dashboards (a deploy marker and the incident window) so the
-timeline tells the story by itself. Pairs with the [DEMO.md](DEMO.md) script.
+budget burns on screen — then recovers. It drops **incident simulation** and
+**recovery** annotations on every dashboard; real release markers come from
+`setup.sh` / `deploy-observe.sh`, so deployment history remains trustworthy.
+Pairs with the [DEMO.md](DEMO.md) script.
 
 ## What it looks like
 
@@ -289,6 +319,12 @@ instrumented services, not mockups. Click any image to view it full size.
 <b>Frontend / RUM</b> — Core Web Vitals, JS errors and full-stack browser-to-backend traces.
 </td>
 </tr>
+<tr>
+<td colspan="2" valign="top">
+<a href="docs/images/deployment-health.png"><img src="docs/images/deployment-health.png" alt="Deployment Health dashboard: release identity, rollout status, errors, latency, Apdex and synthetic probes"></a>
+<b>Deployment Health</b> — real deployment marker and release identity correlated with rollout, restarts, probes, throughput, errors, P95 and Apdex.
+</td>
+</tr>
 </table>
 
 ## Documentation
@@ -301,6 +337,7 @@ instrumented services, not mockups. Click any image to view it full size.
 | [docs/BEYLA.md](docs/BEYLA.md) | Beyla eBPF auto-instrumentation guide |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 | [docs/PRODUCTION.md](docs/PRODUCTION.md) | Production deployment guide |
+| [docs/DEPLOYMENT_OBSERVABILITY.md](docs/DEPLOYMENT_OBSERVABILITY.md) | Real deploy annotations, release identity, CI/CD contract and cardinality guardrails |
 | [docs/COST_ANALYSIS.md](docs/COST_ANALYSIS.md) | Detailed cost comparison |
 | [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | APM and metrics improvements log (historical) |
 | [docs/VERIFICATION_CHECKLIST.md](docs/VERIFICATION_CHECKLIST.md) | Metrics verification checklist |

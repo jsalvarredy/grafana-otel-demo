@@ -4,6 +4,10 @@ metadata:
   name: {{ include "shipping-service.fullname" . }}
   labels:
     {{- include "shipping-service.labels" . | nindent 4 }}
+  annotations:
+    observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+    observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+    observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
 spec:
   replicas: 1
   selector:
@@ -13,11 +17,15 @@ spec:
     metadata:
       labels:
         {{- include "shipping-service.selectorLabels" . | nindent 8 }}
-      {{- if .Values.beyla.enabled }}
+        {{- include "shipping-service.observabilityLabels" . | nindent 8 }}
       annotations:
+        observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+        observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+        observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
+        {{- if .Values.beyla.enabled }}
         # Annotation to indicate Beyla auto-instrumentation
         instrumentation.beyla.io/enabled: "true"
-      {{- end }}
+        {{- end }}
     spec:
       {{- if .Values.beyla.enabled }}
       # Required for Beyla eBPF - share process namespace between containers
@@ -44,7 +52,7 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: "-javaagent:{{ .Values.instrumentation.javaAgent.agentPath }}"
             - name: OTEL_SERVICE_NAME
-              value: {{ .Values.otel.serviceName | quote }}
+              value: {{ .Values.observability.serviceName | quote }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.otel.endpoint | quote }}
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
@@ -58,9 +66,10 @@ spec:
               value: "otlp"
             - name: OTEL_LOGS_EXPORTER
               value: "otlp"
-            # Tag resource so it lines up with the rest of the demo.
+            # Stable OTel resource identity; unbounded deployment metadata stays
+            # on Kubernetes/Grafana annotations, not on every telemetry item.
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: "service.namespace=demo,deployment.environment=demo"
+              value: "service.namespace={{ .Values.observability.serviceNamespace }},service.version={{ .Values.observability.version }},deployment.environment.name={{ .Values.observability.environment }}"
             {{- end }}
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
@@ -103,7 +112,9 @@ spec:
             # Service name for traces and metrics. OTEL_SERVICE_NAME is the
             # supported form (BEYLA_SERVICE_NAME was deprecated in Beyla 2.x+).
             - name: OTEL_SERVICE_NAME
-              value: "{{ .Values.beyla.serviceName }}"
+              value: {{ .Values.observability.serviceName | quote }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace={{ .Values.observability.serviceNamespace }},service.version={{ .Values.observability.version }},deployment.environment.name={{ .Values.observability.environment }}"
             # OTEL exporter configuration - send to Grafana Alloy (OTLP gateway)
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "{{ .Values.beyla.otelEndpoint }}"

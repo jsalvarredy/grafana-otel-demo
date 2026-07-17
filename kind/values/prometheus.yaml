@@ -48,6 +48,12 @@ prometheus-node-exporter:
 
 kube-state-metrics:
   enabled: true # Useful for K8s metrics
+  # Explicit allowlist: by default kube-state-metrics exposes no Kubernetes
+  # label_* fields. These bounded labels power Deployment Health without
+  # allowing arbitrary/high-cardinality labels into Prometheus.
+  metricLabelsAllowlist:
+    - 'deployments=[app.kubernetes.io/version,observability.grafana.com/service-name,observability.grafana.com/environment]'
+    - 'pods=[app.kubernetes.io/version,observability.grafana.com/service-name,observability.grafana.com/environment]'
 
 # ===========================================================================
 # Recording rules: SLO error ratios + multi-window burn rates (Google SRE
@@ -63,18 +69,110 @@ serverFiles:
       - name: slo_http_error_ratio
         interval: 30s
         rules:
+          # Canonical platform SLI. The SDK and Java-agent metric families have
+          # disjoint service_name sets, so they can be summed without double
+          # counting. `(total > 0)` keeps no-traffic periods absent instead of
+          # silently diluting low-volume errors with clamp_min(..., 1 req/s).
           - record: job:http_errors:ratio_rate5m
-            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1)
+            expr: |
+              (
+                (sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) or vector(0))
+                +
+                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) or vector(0))
+              )
+              /
+              (
+                (
+                  (sum(rate(http_requests_total[5m])) or vector(0))
+                  +
+                  (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0))
+                ) > 0
+              )
           - record: job:http_errors:ratio_rate30m
-            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[30m])) / clamp_min(sum(rate(http_requests_total[30m])), 1)
+            expr: |
+              (
+                (sum(rate(http_requests_total{http_status_code=~"5.."}[30m])) or vector(0))
+                +
+                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m])) or vector(0))
+              )
+              /
+              (
+                (
+                  (sum(rate(http_requests_total[30m])) or vector(0))
+                  +
+                  (sum(rate(http_server_request_duration_seconds_count[30m])) or vector(0))
+                ) > 0
+              )
           - record: job:http_errors:ratio_rate1h
-            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[1h])) / clamp_min(sum(rate(http_requests_total[1h])), 1)
+            expr: |
+              (
+                (sum(rate(http_requests_total{http_status_code=~"5.."}[1h])) or vector(0))
+                +
+                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h])) or vector(0))
+              )
+              /
+              (
+                (
+                  (sum(rate(http_requests_total[1h])) or vector(0))
+                  +
+                  (sum(rate(http_server_request_duration_seconds_count[1h])) or vector(0))
+                ) > 0
+              )
           - record: job:http_errors:ratio_rate6h
-            expr: sum(rate(http_requests_total{http_status_code=~"5.."}[6h])) / clamp_min(sum(rate(http_requests_total[6h])), 1)
+            expr: |
+              (
+                (sum(rate(http_requests_total{http_status_code=~"5.."}[6h])) or vector(0))
+                +
+                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h])) or vector(0))
+              )
+              /
+              (
+                (
+                  (sum(rate(http_requests_total[6h])) or vector(0))
+                  +
+                  (sum(rate(http_server_request_duration_seconds_count[6h])) or vector(0))
+                ) > 0
+              )
           - record: service:http_errors:ratio_rate5m
-            expr: sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[5m])) / clamp_min(sum by (service_name) (rate(http_requests_total[5m])), 1)
+            expr: |
+              (
+                (
+                  sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[5m]))
+                  or (sum by (service_name) (rate(http_requests_total[5m])) * 0)
+                )
+                or
+                (
+                  sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+                  or (sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])) * 0)
+                )
+              )
+              /
+              (
+                (
+                  sum by (service_name) (rate(http_requests_total[5m]))
+                  or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
+                ) > 0
+              )
           - record: service:http_errors:ratio_rate1h
-            expr: sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[1h])) / clamp_min(sum by (service_name) (rate(http_requests_total[1h])), 1)
+            expr: |
+              (
+                (
+                  sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[1h]))
+                  or (sum by (service_name) (rate(http_requests_total[1h])) * 0)
+                )
+                or
+                (
+                  sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
+                  or (sum by (service_name) (rate(http_server_request_duration_seconds_count[1h])) * 0)
+                )
+              )
+              /
+              (
+                (
+                  sum by (service_name) (rate(http_requests_total[1h]))
+                  or sum by (service_name) (rate(http_server_request_duration_seconds_count[1h]))
+                ) > 0
+              )
       - name: slo_http_burnrate
         interval: 30s
         rules:

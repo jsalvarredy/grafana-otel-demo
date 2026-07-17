@@ -27,18 +27,23 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.trace.status import Status, StatusCode
 import logging
 
-# Get OTEL endpoint from environment variable or use default
+# Get OTEL endpoint and release identity from environment variables
 otlp_endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318')
+service_name = os.getenv('OTEL_SERVICE_NAME', 'orders-service')
+service_version = os.getenv('OTEL_SERVICE_VERSION', '2.0.0')
+service_namespace = os.getenv('OTEL_SERVICE_NAMESPACE', 'demo')
+deployment_environment = os.getenv('OTEL_DEPLOYMENT_ENVIRONMENT', 'demo')
 
 # Products Service URL (internal service communication)
 products_service_url = os.getenv('PRODUCTS_SERVICE_URL', 'http://otel-demo-app:8080')
 
-# Create shared resource
+# Stable, bounded resource identity. Commit/deployment IDs deliberately stay
+# out of application telemetry to avoid multiplying every metric time series.
 resource = Resource.create({
-    ResourceAttributes.SERVICE_NAME: 'orders-service',
-    ResourceAttributes.SERVICE_VERSION: '2.0.0',
-    ResourceAttributes.SERVICE_NAMESPACE: 'demo',
-    ResourceAttributes.DEPLOYMENT_ENVIRONMENT: 'demo',
+    ResourceAttributes.SERVICE_NAME: service_name,
+    ResourceAttributes.SERVICE_VERSION: service_version,
+    ResourceAttributes.SERVICE_NAMESPACE: service_namespace,
+    'deployment.environment.name': deployment_environment,
 })
 
 # Configure trace provider

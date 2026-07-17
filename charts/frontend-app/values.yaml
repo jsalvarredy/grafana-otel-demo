@@ -4,6 +4,19 @@
 # reverse-proxies /api/* to the backend services on the SAME origin, so the
 # browser's traceparent header propagates to the backend with no CORS needed.
 
+# Release identity shared by Kubernetes metadata and Grafana Faro.
+# setup.sh overrides these values with a unique-by-default per-deploy release ID.
+observability:
+  serviceName: "frontend-shop"
+  serviceNamespace: "demo"
+  version: "1.0.0"
+  environment: "demo"
+  revision: "unknown"
+  deploymentId: "local"
+  deployedAt: ""
+  component: "frontend"
+  partOf: "grafana-otel-demo"
+
 image:
   # Local image built by setup.sh (nginx + Faro SDK vendored at /vendor),
   # loaded into Kind. Use Never so Kind serves the locally loaded image.
@@ -29,8 +42,6 @@ ingress:
 # Where the browser ships RUM data (the Alloy faro.receiver ingress).
 faro:
   collectorUrl: "http://faro.127.0.0.1.nip.io/collect"
-  appName: "frontend-shop"
-  appEnv: "demo"
 
 # Backends proxied same-origin so trace context propagates without CORS.
 backends:

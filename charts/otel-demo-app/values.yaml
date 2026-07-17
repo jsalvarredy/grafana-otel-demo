@@ -1,3 +1,16 @@
+# Release identity shared by Kubernetes metadata and OpenTelemetry resources.
+# setup.sh overrides these values with a unique-by-default per-deploy release ID.
+observability:
+  serviceName: "products-service"
+  serviceNamespace: "demo"
+  version: "2.0.0"
+  environment: "demo"
+  revision: "unknown"
+  deploymentId: "local"
+  deployedAt: ""
+  component: "backend"
+  partOf: "grafana-otel-demo"
+
 image:
   repository: otel-demo-app
   pullPolicy: Never # Force using local image loaded into Kind

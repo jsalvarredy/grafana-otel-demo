@@ -29,14 +29,49 @@ data:
             },
             "enable": true,
             "hide": false,
-            "iconColor": "red",
-            "name": "Deploys & Incidents",
+            "iconColor": "#5794F2",
+            "name": "Deployments",
             "target": {
-              "limit": 100,
+              "limit": 200,
               "matchAny": true,
               "tags": [
-                "deploy",
+                "deployment"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#F2495C",
+            "name": "Incidents",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
                 "incident"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#73BF69",
+            "name": "Recoveries",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "recovery"
               ],
               "type": "tags"
             }

@@ -16,8 +16,12 @@ const {
   ATTR_SERVICE_VERSION,
 } = require('@opentelemetry/semantic-conventions');
 
-// Get OTEL endpoint from environment variable or use default
+// Get OTEL endpoint and release identity from environment variables.
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+const serviceName = process.env.OTEL_SERVICE_NAME || 'products-service';
+const serviceVersion = process.env.OTEL_SERVICE_VERSION || '2.0.0';
+const serviceNamespace = process.env.OTEL_SERVICE_NAMESPACE || 'demo';
+const deploymentEnvironment = process.env.OTEL_DEPLOYMENT_ENVIRONMENT || 'demo';
 
 // Configure trace exporter
 const traceExporter = new OTLPTraceExporter({
@@ -34,15 +38,13 @@ const logExporter = new OTLPLogExporter({
   url: `${otlpEndpoint}/v1/logs`,
 });
 
-// Create shared resource.
-// service.namespace / deployment.environment use stable string keys; the
-// dedicated semconv constants for these moved across versions, so plain keys
-// keep this forward-compatible.
+// Stable, bounded resource identity. Commit/deployment IDs deliberately stay
+// out of application telemetry to avoid multiplying every metric time series.
 const resource = resourceFromAttributes({
-  [ATTR_SERVICE_NAME]: 'products-service',
-  [ATTR_SERVICE_VERSION]: '2.0.0',
-  'service.namespace': 'demo',
-  'deployment.environment': 'demo',
+  [ATTR_SERVICE_NAME]: serviceName,
+  [ATTR_SERVICE_VERSION]: serviceVersion,
+  'service.namespace': serviceNamespace,
+  'deployment.environment.name': deploymentEnvironment,
 });
 
 // Initialize OpenTelemetry SDK with all exporters. The NodeSDK owns the

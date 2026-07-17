@@ -4,6 +4,10 @@ metadata:
   name: {{ include "frontend-app.fullname" . }}
   labels:
     {{- include "frontend-app.labels" . | nindent 4 }}
+  annotations:
+    observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+    observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+    observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
 spec:
   replicas: 1
   selector:
@@ -13,8 +17,12 @@ spec:
     metadata:
       labels:
         {{- include "frontend-app.selectorLabels" . | nindent 8 }}
+        {{- include "frontend-app.observabilityLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+        observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+        observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
     spec:
       containers:
         - name: {{ .Chart.Name }}

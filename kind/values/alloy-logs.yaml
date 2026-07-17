@@ -43,14 +43,9 @@ alloy:
       }
 
       // -------------------------------------------------------------------
-      // Reproduce the labels the old otel-logs-agent produced, so the Loki
-      // dashboards keep working unchanged:
-      //   service_name      <- app.kubernetes.io/name (chart/deployment name:
-      //                        otel-demo-app, otel-python-app, shipping-service,
-      //                        frontend-app). This is exactly what the OTLP
-      //                        path emitted; shipping-service depends on it.
-      //   service_namespace <- pod namespace (gives service_namespace="demo")
-      //   k8s_*             <- pod/namespace/container/node metadata
+      // Preserve the canonical observability identity added by the app charts.
+      // The bounded version/environment labels are intentionally queryable for
+      // post-deploy analysis; commit and deployment ID remain annotations only.
       // -------------------------------------------------------------------
       discovery.relabel "pod_logs" {
         targets = discovery.kubernetes.pods.targets
@@ -75,20 +70,33 @@ alloy:
           source_labels = ["__meta_kubernetes_node_name"]
           target_label  = "k8s_node_name"
         }
-        // Primary: service_name from the app.kubernetes.io/name label.
+        // Canonical OTel service.name from the chart's bounded pod label.
         rule {
-          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          source_labels = ["__meta_kubernetes_pod_label_observability_grafana_com_service_name"]
           target_label  = "service_name"
         }
-        // Fallback: if that label is absent (e.g. some infra pods), use the
-        // container name so no stream is left without a service_name. The
-        // regex only matches when service_name is still empty (starts with ";").
+        // Fallback for infrastructure/third-party pods without that label.
+        rule {
+          source_labels = ["service_name", "__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          separator     = ";"
+          regex         = "^;(.*)$"
+          replacement   = "$1"
+          target_label  = "service_name"
+        }
         rule {
           source_labels = ["service_name", "__meta_kubernetes_pod_container_name"]
           separator     = ";"
           regex         = "^;(.*)$"
           replacement   = "$1"
           target_label  = "service_name"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_version"]
+          target_label  = "service_version"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_observability_grafana_com_environment"]
+          target_label  = "deployment_environment_name"
         }
       }
 

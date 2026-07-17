@@ -24,16 +24,21 @@ data:
           },
           {
             "datasource": {
-              "type": "prometheus",
-              "uid": "Prometheus"
+              "type": "grafana",
+              "uid": "-- Grafana --"
             },
             "enable": true,
-            "expr": "ALERTS{alertstate=\"firing\"}",
             "hide": false,
-            "iconColor": "red",
-            "name": "Firing alerts",
-            "titleFormat": "{{alertname}}",
-            "useValueForTime": false
+            "iconColor": "#5794F2",
+            "name": "Deployments",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "deployment"
+              ],
+              "type": "tags"
+            }
           },
           {
             "datasource": {
@@ -42,14 +47,31 @@ data:
             },
             "enable": true,
             "hide": false,
-            "iconColor": "red",
-            "name": "Deploys & Incidents",
+            "iconColor": "#F2495C",
+            "name": "Incidents",
             "target": {
-              "limit": 100,
+              "limit": 200,
               "matchAny": true,
               "tags": [
-                "deploy",
                 "incident"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#73BF69",
+            "name": "Recoveries",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "recovery"
               ],
               "type": "tags"
             }

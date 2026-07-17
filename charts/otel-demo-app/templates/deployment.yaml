@@ -4,6 +4,10 @@ metadata:
   name: {{ include "otel-demo-app.fullname" . }}
   labels:
     {{- include "otel-demo-app.labels" . | nindent 4 }}
+  annotations:
+    observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+    observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+    observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
 spec:
   replicas: 1
   selector:
@@ -13,6 +17,11 @@ spec:
     metadata:
       labels:
         {{- include "otel-demo-app.selectorLabels" . | nindent 8 }}
+        {{- include "otel-demo-app.observabilityLabels" . | nindent 8 }}
+      annotations:
+        observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
+        observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
+        observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
     spec:
       securityContext:
         runAsNonRoot: true
@@ -34,6 +43,14 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.observability.serviceName | quote }}
+            - name: OTEL_SERVICE_VERSION
+              value: {{ .Values.observability.version | quote }}
+            - name: OTEL_SERVICE_NAMESPACE
+              value: {{ .Values.observability.serviceNamespace | quote }}
+            - name: OTEL_DEPLOYMENT_ENVIRONMENT
+              value: {{ .Values.observability.environment | quote }}
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
