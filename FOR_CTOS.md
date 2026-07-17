@@ -54,21 +54,27 @@ month, with full APM.
 
 | Solution | Annual cost | Where your data lives |
 |---|---|---|
-| Datadog | $45,000 to $75,000 | Datadog cloud |
-| New Relic | $35,000 to $60,000 | New Relic cloud |
-| This stack | $5,000 to $15,000 all-in | Your infrastructure |
+| Datadog | $36,000 at list; $45,000 to $75,000 as typically billed | Datadog cloud |
+| New Relic | $35,000 to $60,000, mostly user seats | New Relic cloud |
+| This stack | $8,400 infrastructure; operations is your platform team's time | Your infrastructure |
 
-The honest version of that last row: the licensing is zero, but self-hosting is
-not free. The infrastructure runs about $4,200 a year on AWS for this reference
-size, and you should budget half to one engineer's time to run the platform.
-That labor is most of the cost, and it is the number vendors count on you not
-counting. Even with it included, the three-year total tells the story.
+The honest version of that last row: the licensing is zero, but self-hosting
+is not free. Production-grade infrastructure runs about $8,400 a year at this
+reference size. The real cost is people, and it is the number vendors count on
+you not counting. If you already run a platform or SRE team, steady-state
+operation is two to four hours a week — 0.1 to 0.2 of an engineer, absorbed as
+marginal work. If you would have to hire dedicated operations for it, budget
+half an engineer and know that at 50 hosts that hire erases the cash savings;
+the case then rests on data control, retention and scale, not on the invoice.
+The three-year totals, with the labor assumption out in the open:
 
 | Solution | Three-year total cost of ownership |
 |---|---|
-| Datadog Enterprise | $225,000 |
-| New Relic Pro | $144,000 |
-| Self-hosted, including setup and support | $55,000 |
+| Datadog Enterprise, at list price | ~$107,000 |
+| Datadog, as typically billed (RUM, synthetics, custom metrics) | $135,000 to $225,000 |
+| New Relic Pro | ~$144,000 |
+| Self-hosted — cash, existing platform team | ~$45,000 |
+| Self-hosted — imputing a dedicated 0.2 FTE | ~$117,000 |
 
 The gap widens as you grow. Metered pricing charges you more for every host and
 every gigabyte you add, while your own infrastructure cost stays close to flat.

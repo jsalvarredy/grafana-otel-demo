@@ -3,8 +3,10 @@
 > **Historical log.** This document describes improvements as they were made at
 > the time; commands and component names reflect the stack of that moment. In
 > particular, the standalone OpenTelemetry Collector mentioned below has since
-> been replaced by **Grafana Alloy** (see `kind/values/alloy.yaml`). For
-> current troubleshooting steps use [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+> been replaced by **Grafana Alloy** (see `kind/values/alloy.yaml`), and the
+> `generate-traffic.sh` script referenced below was renamed — today it is
+> **`traffic.sh`** at the repo root. For current troubleshooting steps use
+> [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Overview
 

@@ -234,9 +234,9 @@ In terminal 2, stop the incident (Ctrl+C) and run the recovery phase:
 **Close with the value:**
 > "Everything you saw — metrics, logs, traces, profiles, the service map,
 > alerting, SLOs and queryless exploration — is 100% open source. No per-host
-> licensing, your data stays in your infrastructure, and you keep unlimited
-> retention. The same capability set as a $20–50k/yr SaaS APM, running on your
-> own cluster."
+> licensing, your data stays in your infrastructure, and retention is bounded
+> by your storage, not a plan tier. The same capability set as a
+> five-figure-a-year SaaS APM, running on your own cluster."
 
 Point back to `/d/platform-home` — green again.
 

@@ -16,7 +16,7 @@ Complete observability with Grafana, Prometheus, Loki, and Tempo. Open source. N
 
 ## Why This Exists
 
-Datadog and NewRelic solve observability well. They also cost $15,000-50,000/year for 50 hosts, send all your telemetry to their cloud, and lock you into their ecosystem.
+Datadog and NewRelic solve observability well. They also cost $35,000-75,000/year for 50 hosts with APM ([the math](docs/COST_ANALYSIS.md)), send all your telemetry to their cloud, and lock you into their ecosystem.
 
 If any of these apply to you, keep reading:
 
@@ -36,7 +36,7 @@ If you are evaluating this as a Datadog or New Relic alternative, start with [FO
 | Log aggregation | Loki | $0.10/GB + indexing | $0.30/GB |
 | Distributed tracing | Tempo | $31/host/mo | Included (limits apply) |
 | Dashboards | Grafana | Included | Included |
-| Data retention | Unlimited | 15 days default | 8 days default |
+| Data retention | You decide — bounded by your storage | 15 days default | 8 days default |
 | Data location | Your infrastructure | Datadog cloud | NewRelic cloud |
 | Licensing cost | $0 | $$$ | $$$ |
 

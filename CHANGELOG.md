@@ -73,6 +73,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shipping-service `/api/` info payload and code comments, `setup.sh` and
   `incident.sh` messages that still claimed Beyla was the default
   instrumentation for the Java service.
+- **Cost figures are now internally consistent** across `README.md`,
+  `FOR_CTOS.md` and `docs/COST_ANALYSIS.md`: one reference scenario (50 hosts,
+  100 GB logs/month, 10-12 platform users), vendor totals that match their own
+  component breakdowns (New Relic now includes user seats — the dominant cost
+  its per-GB tables omitted; Datadog list price vs typical billed amounts is
+  explicit), a self-hosted TCO with the labor assumption out in the open
+  (existing platform team vs dedicated hire, production-grade HA
+  infrastructure instead of the single-node minimum) and a break-even
+  calculation for both scenarios. The three-year self-hosted total previously
+  appeared as both $55,000 and $110,000 in the same document.
+- "Unlimited retention" claims replaced with storage-bound retention and a
+  note about what the demo actually configures (15-day metrics, ephemeral
+  traces/profiles) in `README.md`, `DEMO.md` and `docs/COST_ANALYSIS.md`.
+- `docs/API.md` no longer claims Beyla eBPF is the Shipping service's
+  telemetry source; the OTel Java agent is the default and Beyla stays
+  opt-in. The historical banner in `docs/IMPROVEMENTS.md` now maps the
+  renamed traffic script (`generate-traffic.sh` → `traffic.sh`).
 
 ### Removed
 - `docs/Architecture.jpg` (pre-Alloy architecture; replaced by the Mermaid
