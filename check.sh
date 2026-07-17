@@ -23,6 +23,7 @@ GRAFANA_PASS="${GRAFANA_PASS:-Mikroways123}"
 AUTH="${GRAFANA_USER}:${GRAFANA_PASS}"
 INGRESS_HOST="${INGRESS_HOST:-localhost}"
 WARMUP=1
+DEPLOYMENT_ANNOTATION_REQUIRED="${DEPLOYMENT_ANNOTATION_REQUIRED:-1}"
 [ "${1:-}" = "--no-warmup" ] && WARMUP=0
 
 # Use the repo's kubeconfig if present and none is set.
@@ -84,16 +85,88 @@ fi
 section "Platform"
 # ---------------------------------------------------------------------------
 if command -v kubectl >/dev/null 2>&1; then
-  notready=$(kubectl get pods -n monitoring --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l | tr -d ' ')
-  if [ "${notready:-1}" = "0" ]; then ok "All monitoring pods Running"; else bad "$notready monitoring pod(s) not Running"; fi
-  dnotready=$(kubectl get pods -n demo --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l | tr -d ' ')
-  if [ "${dnotready:-1}" = "0" ]; then ok "All demo pods Running"; else bad "$dnotready demo pod(s) not Running"; fi
+  check_namespace_ready(){
+    local ns="$1" label="$2" rows bad_rows
+    if ! rows=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null); then
+      bad "Cannot query pods in namespace $ns"
+      return
+    fi
+    if [ -z "$rows" ]; then
+      bad "No pods found in namespace $ns"
+      return
+    fi
+    # STATUS=Running is insufficient: a pod can be 1/2 Running while one
+    # container is CrashLoopBackOff. Require READY current == total.
+    bad_rows=$(printf '%s\n' "$rows" | awk '
+      $3 == "Completed" { next }
+      { split($2, ready, "/"); if ($3 != "Running" || ready[1] != ready[2]) print $1 " (" $2 ", " $3 ")" }
+    ')
+    if [ -z "$bad_rows" ]; then
+      ok "All $label pods fully Ready"
+    else
+      bad "$label pod(s) not fully Ready: $(printf '%s' "$bad_rows" | paste -sd ';' -)"
+    fi
+  }
+  check_namespace_ready monitoring monitoring
+  check_namespace_ready demo demo
 else
   warn "kubectl not found — skipping pod checks"
 fi
 
 gver=$(curl -s -u "$AUTH" "$GRAFANA_URL/api/health" 2>/dev/null | sed -nE 's/.*"version":[[:space:]]*"([^"]+)".*/\1/p')
 if [ -n "$gver" ]; then ok "Grafana reachable (v$gver)"; else bad "Grafana not reachable at $GRAFANA_URL"; fi
+
+# ---------------------------------------------------------------------------
+section "Deployment observability"
+# ---------------------------------------------------------------------------
+if command -v kubectl >/dev/null 2>&1; then
+  release_versions=""
+  release_bad=0
+  release_version=""
+  release_deployment_id=""
+  for deployment in otel-demo-app otel-python-app shipping-service frontend-app; do
+    version=$(kubectl get deployment "$deployment" -n demo -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}' 2>/dev/null || true)
+    deployment_id=$(kubectl get deployment "$deployment" -n demo -o jsonpath='{.metadata.annotations.observability\.grafana\.com/deployment-id}' 2>/dev/null || true)
+    pod_versions=$(kubectl get pods -n demo -l "app.kubernetes.io/instance=$deployment" --field-selector=status.phase=Running \
+      -o jsonpath='{range .items[*]}{.metadata.labels.app\.kubernetes\.io/version}{"\n"}{end}' 2>/dev/null | sed '/^$/d' | sort -u || true)
+    if [ -z "$version" ] || [ "$pod_versions" != "$version" ] || [ -z "$deployment_id" ]; then
+      release_bad=$((release_bad+1))
+      continue
+    fi
+    if { [ -n "$release_version" ] && [ "$release_version" != "$version" ]; } || \
+       { [ -n "$release_deployment_id" ] && [ "$release_deployment_id" != "$deployment_id" ]; }; then
+      release_bad=$((release_bad+1))
+      continue
+    fi
+    release_version="$version"
+    release_deployment_id="$deployment_id"
+    release_versions="${release_versions}${deployment}=${version} "
+  done
+  if [ "$release_bad" -eq 0 ]; then
+    ok "Release ${release_version} / ${release_deployment_id} is consistent on all Deployments and Running Pods"
+  else
+    bad "$release_bad app deployment(s) have mismatching version/deployment ID or stale Running Pods"
+  fi
+else
+  release_version=""
+  release_deployment_id=""
+  warn "kubectl not found — skipping release label checks"
+fi
+
+if [ "$DEPLOYMENT_ANNOTATION_REQUIRED" = "0" ]; then
+  info "Deployment annotation check deferred until post-deploy verification completes"
+else
+  annotations=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/annotations" \
+    --data-urlencode 'tags=deployment' --data-urlencode 'limit=100' 2>/dev/null || true)
+  if [ -n "$release_deployment_id" ] && \
+     echo "$annotations" | grep -Fq "id=${release_deployment_id}" && \
+     echo "$annotations" | grep -Fq "version=${release_version}" && \
+     echo "$annotations" | grep -Fq 'status:succeeded'; then
+    ok "Grafana annotation matches current release ${release_deployment_id} (${release_version}, succeeded)"
+  else
+    bad "No succeeded Grafana annotation matches the deployment ID/version currently running"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 section "Metrics signal (RED)"

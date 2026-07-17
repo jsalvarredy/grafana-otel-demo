@@ -10,6 +10,19 @@
 #
 # Keep exactly ONE of the two enabled to avoid double-counting HTTP metrics.
 
+# Release identity shared by Kubernetes metadata and OpenTelemetry resources.
+# setup.sh overrides these values with a unique-by-default per-deploy release ID.
+observability:
+  serviceName: "shipping-service"
+  serviceNamespace: "demo"
+  version: "1.0.0"
+  environment: "demo"
+  revision: "unknown"
+  deploymentId: "local"
+  deployedAt: ""
+  component: "backend"
+  partOf: "grafana-otel-demo"
+
 image:
   repository: shipping-service
   pullPolicy: Never # Force using local image loaded into Kind
@@ -36,9 +49,9 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-# OTLP target + service identity shared by both instrumentation methods.
+# OTLP target shared by both instrumentation methods. Service identity comes
+# from observability.serviceName above.
 otel:
-  serviceName: "shipping-service"
   endpoint: "http://alloy.monitoring.svc.cluster.local:4318"
 
 # DEFAULT instrumentation: OpenTelemetry Java agent (bytecode, any kernel).
@@ -63,8 +76,7 @@ beyla:
     tag: "3.24.0"
   # Target the Java application by port
   openPort: 8080
-  # Service name for telemetry
-  serviceName: "shipping-service"
+  # Service identity comes from observability.serviceName.
   # Grafana Alloy (OTLP gateway) endpoint
   otelEndpoint: "http://alloy.monitoring.svc.cluster.local:4318"
 

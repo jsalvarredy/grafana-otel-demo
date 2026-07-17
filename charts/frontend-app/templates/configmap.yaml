@@ -25,8 +25,9 @@ data:
     <script>
       // --- Config injected by Helm (isolated to these three simple lines) ---
       window.FARO_URL = '{{ .Values.faro.collectorUrl }}';
-      window.FARO_APP = '{{ .Values.faro.appName }}';
-      window.FARO_ENV = '{{ .Values.faro.appEnv }}';
+      window.FARO_APP = '{{ .Values.observability.serviceName }}';
+      window.FARO_VERSION = '{{ .Values.observability.version }}';
+      window.FARO_ENV = '{{ .Values.observability.environment }}';
     </script>
     <script>
       function logLine(msg){ document.getElementById('log').textContent += msg + '\n'; }
@@ -40,7 +41,7 @@ data:
         var Sdk = window.GrafanaFaroWebSdk, T = window.GrafanaFaroWebTracing;
         var base = {
           url: window.FARO_URL,
-          app: { name: window.FARO_APP, version: '1.0.0', environment: window.FARO_ENV },
+          app: { name: window.FARO_APP, version: window.FARO_VERSION, environment: window.FARO_ENV },
           sessionTracking: { enabled: true }
         };
         var faro = null;

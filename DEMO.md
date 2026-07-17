@@ -53,6 +53,7 @@ again any time before you present.
 | View | Link |
 |------|------|
 | Platform Home (landing) | `/d/platform-home` |
+| Deployment Health (release impact) | `/d/deployment-health` |
 | APM (New Relic-style) | `/d/apm-overview` |
 | Service Time Breakdown | `/d/service-breakdown` |
 | Executive Summary | `/d/executive-dashboard` |
@@ -88,8 +89,12 @@ again any time before you present.
 > languages: Node.js, Python and Java."
 
 **Do:** point at throughput, latency, error rate, and the "currently firing
-alerts" panel (quiet = healthy). Click one card to show it deep-links into a
-detailed dashboard.
+alerts" panel (quiet = healthy). Click the **Deployment Health** card: the blue
+marker is the real `setup.sh` rollout, and the table shows the exact version on
+all four workloads. The current impact series are live; on a reused cluster,
+select a historical offset that falls before the blue marker to compare. On the
+first clean run the older series is correctly absent. Then return to Platform
+Home.
 
 ---
 
@@ -122,17 +127,19 @@ In **terminal 2**, trigger a sustained, realistic degradation:
 ```
 
 **Say:**
-> "Let's simulate a partial outage — a deploy gone wrong. This drives real 5xx
-> errors and latency into Products and Orders, while healthy traffic keeps
-> flowing, so it looks like a true partial outage, not a flatline."
+> "Let's simulate a partial outage after the release we just inspected. This
+> drives real 5xx errors and latency into Products and Orders, while healthy
+> traffic keeps flowing, so it looks like a true partial outage, not a
+> flatline. The release marker remains trustworthy: this tool changes traffic,
+> not code."
 
 The script prints exactly what to watch and the links. Keep it running.
 
-> It also drops a **deploy marker** and an **incident region** as Grafana
-> annotations (the red line and shaded band), so the timeline tells the story by
-> itself — "a deploy went out *here*, and things degraded *right after*". They
-> show up on Platform Home, Service Overview and the SLO dashboard via the
-> "Deploys & Incidents" annotation query.
+> It drops a red **incident simulation** marker immediately and closes the
+> shaded region at the actual stop time (including Ctrl+C). A recovery run gets
+> a separate green marker. Real deploys are blue and come only from `setup.sh`
+> or `deploy-observe.sh`; all dashboards expose the separate **Deployments**,
+> **Incidents** and **Recoveries** annotation toggles.
 
 > Note: alerts have a `for:` window of 2–5 min, so fire the incident now and let
 > it build while you narrate Act 4.

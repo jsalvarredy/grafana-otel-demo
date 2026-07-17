@@ -64,7 +64,7 @@ FOR_CTOS.md                # Brief para líderes de ingeniería (costos y trade-
 - **Synthetic**: probe_success, probe_duration_seconds (blackbox)
 - **k6**: k6_* vía remote write
 
-## 16 dashboards provisionados
+## 17 dashboards provisionados
 Platform Home (landing por defecto), APM (Apdex), Service Time Breakdown,
 Service Overview (RED), Service Map, Distributed Tracing, Continuous Profiling,
 Logs Search, Log Analysis, Executive, Observability Overview, SLO/SLI Error
@@ -115,7 +115,7 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 - Profiling para Python y Java (hoy solo Node empuja a Pyroscope)
 - Retention en Loki + persistencia para Tempo/Pyroscope
 - NetworkPolicies, securityContext en shipping/frontend, ServiceAccounts dedicados
-- Folders para los 16 dashboards; reemplazar el K8s dashboard genérico (212KB importado)
+- Folders para los 17 dashboards; reemplazar el K8s dashboard genérico (212KB importado)
 - UI de Alloy expuesta por ingress (grafo del pipeline en vivo) y dashboard de meta-monitoring
 
 ## Comandos útiles

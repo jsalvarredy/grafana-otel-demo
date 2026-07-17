@@ -35,3 +35,6 @@ Thumbs.db
 
 # Python
 __pycache__/
+
+# Runtime deployment evidence (upload as CI artifacts; do not commit)
+artifacts/deployments/

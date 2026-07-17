@@ -24,16 +24,21 @@ data:
           },
           {
             "datasource": {
-              "type": "prometheus",
-              "uid": "Prometheus"
+              "type": "grafana",
+              "uid": "-- Grafana --"
             },
             "enable": true,
-            "expr": "ALERTS{alertstate=\"firing\"}",
             "hide": false,
-            "iconColor": "red",
-            "name": "Firing alerts",
-            "titleFormat": "{{alertname}}",
-            "useValueForTime": false
+            "iconColor": "#5794F2",
+            "name": "Deployments",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "deployment"
+              ],
+              "type": "tags"
+            }
           },
           {
             "datasource": {
@@ -42,14 +47,31 @@ data:
             },
             "enable": true,
             "hide": false,
-            "iconColor": "red",
-            "name": "Deploys & Incidents",
+            "iconColor": "#F2495C",
+            "name": "Incidents",
             "target": {
-              "limit": 100,
+              "limit": 200,
               "matchAny": true,
               "tags": [
-                "deploy",
                 "incident"
+              ],
+              "type": "tags"
+            }
+          },
+          {
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": false,
+            "iconColor": "#73BF69",
+            "name": "Recoveries",
+            "target": {
+              "limit": 200,
+              "matchAny": true,
+              "tags": [
+                "recovery"
               ],
               "type": "tags"
             }
@@ -443,34 +465,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "description": "Currently firing Grafana alerts. Quiet is good.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 1
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
+          "description": "Grafana-managed alert instances. Quiet is good.",
           "gridPos": {
             "h": 8,
             "w": 8,
@@ -479,32 +474,26 @@ data:
           },
           "id": 21,
           "options": {
-            "colorMode": "background",
-            "graphMode": "none",
-            "justifyMode": "center",
-            "orientation": "horizontal",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "textMode": "value_and_name"
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
-              "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
-              "legendFormat": "Firing alerts",
-              "refId": "A"
+            "alertInstanceLabelFilter": "",
+            "alertName": "",
+            "dashboardAlerts": false,
+            "folder": "Demo Alerts",
+            "groupBy": [
+              "alertname"
+            ],
+            "groupMode": "default",
+            "maxItems": 20,
+            "sortOrder": 1,
+            "stateFilter": {
+              "error": true,
+              "firing": true,
+              "noData": true,
+              "normal": false,
+              "pending": true
             }
-          ],
-          "title": "Active Alerts",
-          "type": "stat"
+          },
+          "title": "Active Grafana Alerts",
+          "type": "alertlist"
         },
         {
           "collapsed": false,
@@ -533,7 +522,7 @@ data:
               "showLineNumbers": false,
               "showMiniMap": false
             },
-            "content": "<div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:6px 2px\">\n  <a href=\"/d/apm-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">APM</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Apdex, response time, throughput &amp; errors per service &mdash; New Relic-style.</div></div></a>\n  <a href=\"/d/service-breakdown\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Time Breakdown</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Response time split by component: app vs Postgres, Redis, Mongo &amp; external.</div></div></a>\n  <a href=\"/d/apm-service-map\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Map</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Who calls whom, with live rate &amp; latency on each edge.</div></div></a>\n  <a href=\"/d/otel-service-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Overview</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">RED metrics, latency percentiles, per-endpoint table.</div></div></a>\n  <a href=\"/d/super-traces-poc-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Distributed Tracing</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Errors &amp; slow traces, full span waterfalls in Tempo.</div></div></a>\n  <a href=\"/d/super-logs-poc-v3\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Logs &amp; Analysis</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Structured logs in Loki, correlated to traces by trace_id.</div></div></a>\n  <a href=\"/d/apm-profiling\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Continuous Profiling</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">CPU flame graphs from Pyroscope. Free here, paid in SaaS.</div></div></a>\n  <a href=\"/d/slo-sli-error-budget-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">SLO / Error Budget</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Availability, burn rate and remaining error budget.</div></div></a>\n</div>",
+            "content": "<div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:6px 2px\">\n  <a href=\"/d/deployment-health\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #5794F2;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Deployment Health</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Release version, rollout status and historical comparison in one view.</div></div></a>\n  <a href=\"/d/apm-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">APM</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Apdex, response time, throughput &amp; errors per service &mdash; New Relic-style.</div></div></a>\n  <a href=\"/d/service-breakdown\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Time Breakdown</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Response time split by component: app vs Postgres, Redis, Mongo &amp; external.</div></div></a>\n  <a href=\"/d/apm-service-map\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Map</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Who calls whom, with live rate &amp; latency on each edge.</div></div></a>\n  <a href=\"/d/otel-service-overview\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Service Overview</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">RED metrics, latency percentiles, per-endpoint table.</div></div></a>\n  <a href=\"/d/super-traces-poc-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Distributed Tracing</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Errors &amp; slow traces, full span waterfalls in Tempo.</div></div></a>\n  <a href=\"/d/super-logs-poc-v3\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Logs &amp; Analysis</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Structured logs in Loki, correlated to traces by trace_id.</div></div></a>\n  <a href=\"/d/apm-profiling\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">Continuous Profiling</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">CPU flame graphs from Pyroscope. Free here, paid in SaaS.</div></div></a>\n  <a href=\"/d/slo-sli-error-budget-v1\" style=\"text-decoration:none\"><div style=\"background:#1f1f23;border:1px solid #33333a;border-radius:8px;padding:14px\"><div style=\"font-size:15px;font-weight:700;color:#fff\">SLO / Error Budget</div><div style=\"font-size:12px;color:#9aa0a6;margin-top:4px\">Availability, burn rate and remaining error budget.</div></div></a>\n</div>",
             "mode": "html"
           },
           "transparent": true,

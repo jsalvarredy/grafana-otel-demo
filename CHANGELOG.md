@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Deployment identity is now unique-by-default and end-to-end**: each `setup.sh` run
+  uses one release tag across container images, Kubernetes Deployment/Pod
+  labels, OpenTelemetry `service.version` / `deployment.environment.name` and
+  Faro app metadata. Reusing a Kind cluster now performs a real rollout instead
+  of silently keeping an old `latest` pod.
+- `incident.sh` no longer invents deploy/rollback events. It records incident
+  simulations and recovery separately and closes the region at the actual end.
+- Deployment, incident and recovery annotations are separate, color-coded and
+  available on all provisioned dashboards.
 - **Runtimes off EOL**: Products service moved from Node.js 18 (EOL) to
   Node.js 22 LTS; Orders service base image from Python 3.11 to 3.13;
   Shipping service from Spring Boot 3.2 / Java 17 to Spring Boot 3.5.3 /
@@ -26,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Express bumped to 4.22.x.
 
 ### Added
+- `deployment-snapshot.sh`: atomic, no-overwrite `deployment-snapshot.v1`
+  evidence bundles containing the deployment event, Kubernetes/Helm state,
+  image IDs, matching Grafana annotation/dashboard/alerts, six post-deploy SLIs
+  and verified SHA-256 checksums. `setup.sh` captures one after every certified
+  successful release.
+- `deploy-observe.sh`: reusable local/CI deployment annotation client with
+  success/failure, actual duration, services, version, environment, revision,
+  actor, pipeline URL and optional `deployment-event.v1` JSON artifact.
+- **Deployment Health** dashboard: release identity, rollout convergence,
+  image digests/restarts and current-versus-historical-offset throughput, error rate,
+  P95, Apdex and synthetic availability.
+- `docs/DEPLOYMENT_OBSERVABILITY.md` with the CI/CD contract, authentication,
+  audit-boundary and cardinality guidance.
 - Renovate configuration (`renovate.json`) covering Helm charts (helmfile),
   container images, npm/Maven/pip dependencies and pinned versions annotated
   with `# renovate:` markers (OTel Java agent, Faro bundles, Beyla, Grafana
@@ -34,6 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README badges and a versioned Mermaid architecture diagram.
 
 ### Fixed
+- `check.sh` now rejects `1/2 Running` pods, verifies release labels on
+  Deployment/Pod pairs and requires a real deployment annotation. `setup.sh`
+  fails closed when readiness validation fails.
+- Canonical SLO error-ratio rules now include both SDK and Java-agent services
+  and no longer dilute low-volume traffic with `clamp_min(rate, 1)`. Grafana
+  error/P95 alerts reuse canonical populations and cover Shipping.
+- Alloy pod-log labels now use canonical service name, release version and
+  deployment environment, matching OTLP telemetry.
 - Documentation drift left over from the Alloy consolidation: README
   component list (Alloy, Pyroscope, blackbox exporter were missing/wrong),
   `kind/README.md` structure, `docs/TROUBLESHOOTING.md` and
