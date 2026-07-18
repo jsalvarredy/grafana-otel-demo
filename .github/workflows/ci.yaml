@@ -107,8 +107,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@f9424c10c36e288d5fa79bd3dfd1aeb2d6eae808 # v0.36.0
         with:
+          # The action's default Trivy (0.65.0) has no release binaries left
+          # upstream (get.trivy.dev -> 404); pin one that still ships them.
+          version: v0.72.0
           scan-type: config
           scan-ref: .
           severity: HIGH,CRITICAL
