@@ -28,7 +28,7 @@ SLOs multi-burn-rate y exploración queryless (Drilldown).
 |----------|----------|-----------------|---------|
 | Products Service | Node.js 22 (Express) | OTel SDK 2.x manual + Pyroscope | products.127.0.0.1.nip.io |
 | Orders Service | Python 3.13 (Flask) | OTel SDK manual | orders.127.0.0.1.nip.io |
-| Shipping Service | Java 21 (Spring Boot 3.5) | OTel Java agent (default) / Beyla eBPF 3.x (opt-in, requiere kernel BTF) | shipping.127.0.0.1.nip.io |
+| Shipping Service | Java 21 (Spring Boot 3.5) | OTel Java agent (default) / Beyla eBPF 3.x (opt-in, requiere kernel BTF) + Pyroscope Java agent (profiling) | shipping.127.0.0.1.nip.io |
 | Faro Shop (frontend) | nginx + Faro Web SDK (vendored) | Grafana Faro (RUM) + web tracing browser→backend | shop.127.0.0.1.nip.io |
 
 ## Estructura del repo
@@ -114,7 +114,8 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 - GIF del flujo exemplar→trace→log→flame graph y devcontainer/Codespaces en README
 - PostgreSQL real para reemplazar los spans simulados de DB (withPostgres/withRedis/withMongo)
 - Unificar semconv HTTP de los SDK apps con la estable (elimina los `or` en queries)
-- Profiling para Python y Java (hoy solo Node empuja a Pyroscope)
+- Profiling para Python (Node y Java ya empujan a Pyroscope; Java vía
+  agente Pyroscope baked-in, segundo -javaagent en JAVA_TOOL_OPTIONS)
 - Retention en Loki + persistencia para Tempo/Pyroscope
 - NetworkPolicies, securityContext en shipping/frontend, ServiceAccounts dedicados
 - Folders para los 17 dashboards; reemplazar el K8s dashboard genérico (212KB importado)

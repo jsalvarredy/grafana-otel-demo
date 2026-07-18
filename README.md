@@ -55,7 +55,7 @@ Access Grafana: http://grafana.127.0.0.1.nip.io
 - User: `admin`
 - Password: `Mikroways123`
 
-The demo includes three instrumented microservices (Node.js, Python, and Java) that generate realistic e-commerce telemetry. The Java service is auto-instrumented with **zero code changes** — by the OpenTelemetry Java agent by default (works on any kernel), with Beyla eBPF available as a one-flag opt-in on BTF-enabled kernels.
+The demo includes three instrumented microservices (Node.js, Python, and Java) that generate realistic e-commerce telemetry. The Java service is auto-instrumented with **zero code changes** — by the OpenTelemetry Java agent by default (works on any kernel), with Beyla eBPF available as a one-flag opt-in on BTF-enabled kernels. Continuous profiling is equally zero-code on Java: the Pyroscope agent rides along as a second `-javaagent` and pushes CPU/allocation/lock flame graphs.
 
 ## Cost Comparison
 
@@ -112,6 +112,7 @@ flowchart LR
     O -- OTLP --> A
     S -- OTLP --> A
     P -- profiles --> PY
+    S -- profiles --> PY
     A -- "remote_write (exemplars)" --> PR
     A -- "OTLP logs" --> L
     A -- traces --> T

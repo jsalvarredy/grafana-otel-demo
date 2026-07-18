@@ -61,6 +61,22 @@ instrumentation:
     enabled: true
     agentPath: "/otel/opentelemetry-javaagent.jar"
 
+# Continuous profiling: Pyroscope Java agent (async-profiler under the hood),
+# baked into the image like the OTel agent and attached as a second -javaagent
+# via JAVA_TOOL_OPTIONS. Independent of the instrumentation choice above, so it
+# keeps producing flame graphs whether HTTP telemetry comes from the OTel agent
+# or from Beyla. Still zero application code changes.
+profiling:
+  pyroscope:
+    enabled: true
+    agentPath: "/otel/pyroscope.jar"
+    serverAddress: "http://pyroscope.monitoring.svc.cluster.local:4040"
+    # itimer needs no perf_event access, so it works unprivileged in kind.
+    event: "itimer"
+    # JFR format multiplexes CPU + allocation + lock profiles in one stream.
+    alloc: "512k"
+    lock: "10ms"
+
 # OPT-IN instrumentation: Beyla eBPF sidecar. Requires a BTF-enabled kernel.
 # If you enable this, set instrumentation.javaAgent.enabled=false to avoid
 # emitting duplicate HTTP metrics from both the agent and Beyla.

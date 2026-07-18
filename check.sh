@@ -207,7 +207,11 @@ section "Profiles signal"
 NOW=$(date +%s)000; FROM=$(( $(date +%s) - 3600 ))000
 prof=$(curl -s -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Pyroscope/querier.v1.QuerierService/LabelValues" \
   -H 'Content-Type: application/json' -d "{\"name\":\"service_name\",\"start\":${FROM},\"end\":${NOW}}" 2>/dev/null)
-if echo "$prof" | grep -q 'products-service'; then ok "Pyroscope has profiles (products-service)"; else warn "No profiles found yet"; fi
+# products-service pushes via the Node.js SDK; shipping-service via the
+# Pyroscope Java agent (second -javaagent, zero code changes).
+for svc in products-service shipping-service; do
+  if echo "$prof" | grep -q "$svc"; then ok "Pyroscope has profiles ($svc)"; else warn "No profiles found yet for $svc"; fi
+done
 
 # ---------------------------------------------------------------------------
 section "Correlation: exemplars (metric → trace)"

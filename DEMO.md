@@ -172,9 +172,12 @@ The script prints exactly what to watch and the links. Keep it running.
 > copy-pasting timestamps across four different tools."
 
 **Profiling (the premium differentiator):** the same flame graph lives on
-`/d/apm-profiling`.
+`/d/apm-profiling`, side by side for two runtimes: products-service (Node.js
+SDK) and shipping-service (Java — profiled by the Pyroscope agent with zero
+code changes, same story as its instrumentation).
 > "Continuous profiling — a paid add-on in Datadog/New Relic — included here,
-> and wired straight into the trace view."
+> and wired straight into the trace view. Even the Java service you never
+> touched gets flame graphs."
 
 **The Distributed Tracing dashboard** (`/d/super-traces-poc-v1`) ties it together:
 it now opens with the **service map**, **RED metrics derived from spans** (rate,

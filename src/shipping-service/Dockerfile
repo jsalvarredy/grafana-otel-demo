@@ -33,13 +33,21 @@ WORKDIR /app
 ARG OTEL_AGENT_VERSION=2.29.0
 ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
 
+# Pyroscope Java agent (continuous profiling: CPU/alloc/lock flame graphs).
+# Same zero-code approach as the OTel agent: baked in, pinned, activated by the
+# Helm chart via JAVA_TOOL_OPTIONS (profiling.pyroscope.enabled, the default).
+# Bundles async-profiler >= 2.9, which works on musl (this Alpine base).
+# renovate: datasource=github-releases depName=grafana/pyroscope-java extractVersion=^v(?<version>.*)$
+ARG PYROSCOPE_AGENT_VERSION=2.8.0
+ADD https://github.com/grafana/pyroscope-java/releases/download/v${PYROSCOPE_AGENT_VERSION}/pyroscope.jar /otel/pyroscope.jar
+
 # Copy the built JAR
 COPY --from=build /app/target/*.jar app.jar
 
-# Create non-root user and make the agent jar world-readable for it.
+# Create non-root user and make the agent jars world-readable for it.
 RUN addgroup -g 1000 appgroup && \
     adduser -u 1000 -G appgroup -D appuser && \
-    chmod 0644 /otel/opentelemetry-javaagent.jar
+    chmod 0644 /otel/opentelemetry-javaagent.jar /otel/pyroscope.jar
 USER appuser
 
 EXPOSE 8080
