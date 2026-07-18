@@ -107,8 +107,10 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)
-- CI en GitHub Actions: helm lint + kubeconform + shellcheck + promtool +
-  builds + Trivy + e2e (kind + setup.sh + check.sh como gate)
+- ~~CI en GitHub Actions~~ HECHO: `.github/workflows/ci.yaml` (shellcheck,
+  helm lint + kubeconform, promtool, JSON de dashboards, builds, Trivy
+  report-only) + `e2e.yaml` (kind + setup.sh + check.sh, manual/semanal).
+  Pendiente: promover e2e a gate de PR cuando acumule historial estable.
 - GIF del flujo exemplar→trace→log→flame graph y devcontainer/Codespaces en README
 - PostgreSQL real para reemplazar los spans simulados de DB (withPostgres/withRedis/withMongo)
 - Unificar semconv HTTP de los SDK apps con la estable (elimina los `or` en queries)

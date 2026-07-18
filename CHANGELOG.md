@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI pipeline on GitHub Actions** (`.github/workflows/ci.yaml`): shellcheck
+  on every script, `helm lint` + `kubeconform -strict` per chart, `promtool
+  check rules` on the SLO recording rules extracted from
+  `kind/values/prometheus.yaml`, JSON validation of all 17 dashboard
+  ConfigMaps, Docker builds of the 4 demo services, and a report-only Trivy
+  config scan.
+- **E2E workflow** (`.github/workflows/e2e.yaml`, manual + weekly): boots the
+  full demo on a runner via `setup.sh` and gates on `check.sh` (4 signals).
+
+### Fixed
+- `traffic.sh`: declare-and-assign split on 6 `local` statements (shellcheck
+  SC2155 — masked command exit codes).
+
 ### Changed
 - **Deployment identity is now unique-by-default and end-to-end**: each `setup.sh` run
   uses one release tag across container images, Kubernetes Deployment/Pod

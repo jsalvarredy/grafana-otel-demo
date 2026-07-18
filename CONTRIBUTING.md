@@ -29,7 +29,10 @@ Tear down with `kind delete cluster --name grafana-otel-demo`.
 
 ## Before opening a PR
 
-Run the same validations CI will run (and reviewers will ask for):
+CI (`.github/workflows/ci.yaml`) runs these automatically on every PR:
+shellcheck, `helm lint` + `kubeconform` per chart, `promtool check rules`,
+dashboard JSON validation, Docker builds and a Trivy config scan. Run the
+same validations locally to iterate faster:
 
 ```bash
 helm lint charts/*                                   # chart sanity
