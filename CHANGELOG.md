@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Continuous profiling for the Java shipping-service** via the Pyroscope
+  Java agent v2.8.0 (async-profiler), baked into the image and attached as a
+  second `-javaagent` through `JAVA_TOOL_OPTIONS` — zero application code
+  changes, consistent with the service's instrumentation story. Pushes JFR
+  profiles (CPU via itimer + allocation + lock) directly to Pyroscope with
+  the same `service_name`/`service_namespace` identity as the other signals.
+  Enabled by default (`profiling.pyroscope.enabled`), independent of the
+  OTel-agent-vs-Beyla choice. The Continuous Profiling dashboard now shows
+  Node.js and Java flame graphs side by side, and `check.sh` verifies
+  shipping-service profiles too.
 - **CI pipeline on GitHub Actions** (`.github/workflows/ci.yaml`): shellcheck
   on every script, `helm lint` + `kubeconform -strict` per chart, `promtool
   check rules` on the SLO recording rules extracted from

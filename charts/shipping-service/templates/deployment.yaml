@@ -43,14 +43,24 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-          {{- if or .Values.instrumentation.javaAgent.enabled .Values.env }}
+          {{- $javaAgents := list }}
+          {{- if .Values.instrumentation.javaAgent.enabled }}
+          {{- $javaAgents = append $javaAgents (printf "-javaagent:%s" .Values.instrumentation.javaAgent.agentPath) }}
+          {{- end }}
+          {{- if .Values.profiling.pyroscope.enabled }}
+          {{- $javaAgents = append $javaAgents (printf "-javaagent:%s" .Values.profiling.pyroscope.agentPath) }}
+          {{- end }}
+          {{- if or $javaAgents .Values.env }}
           env:
-            {{- if .Values.instrumentation.javaAgent.enabled }}
-            # Enable the OpenTelemetry Java agent baked into the image. The JVM
-            # picks up JAVA_TOOL_OPTIONS automatically, so the app entrypoint is
-            # unchanged - still "zero code change" auto-instrumentation.
+            {{- if $javaAgents }}
+            # Attach the agents baked into the image (OTel telemetry and/or
+            # Pyroscope profiling). The JVM picks up JAVA_TOOL_OPTIONS
+            # automatically, so the app entrypoint is unchanged - still
+            # "zero code change" auto-instrumentation.
             - name: JAVA_TOOL_OPTIONS
-              value: "-javaagent:{{ .Values.instrumentation.javaAgent.agentPath }}"
+              value: {{ join " " $javaAgents | quote }}
+            {{- end }}
+            {{- if .Values.instrumentation.javaAgent.enabled }}
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.observability.serviceName | quote }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -70,6 +80,27 @@ spec:
             # on Kubernetes/Grafana annotations, not on every telemetry item.
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: "service.namespace={{ .Values.observability.serviceNamespace }},service.version={{ .Values.observability.version }},deployment.environment.name={{ .Values.observability.environment }}"
+            {{- end }}
+            {{- if .Values.profiling.pyroscope.enabled }}
+            # Continuous profiling: the Pyroscope agent pushes JFR profiles
+            # (CPU via itimer + allocation + lock) straight to the Pyroscope
+            # server; it does not go through the Alloy OTLP gateway.
+            - name: PYROSCOPE_APPLICATION_NAME
+              value: {{ .Values.observability.serviceName | quote }}
+            - name: PYROSCOPE_SERVER_ADDRESS
+              value: {{ .Values.profiling.pyroscope.serverAddress | quote }}
+            - name: PYROSCOPE_FORMAT
+              value: "jfr"
+            - name: PYROSCOPE_PROFILER_EVENT
+              value: {{ .Values.profiling.pyroscope.event | quote }}
+            - name: PYROSCOPE_PROFILER_ALLOC
+              value: {{ .Values.profiling.pyroscope.alloc | quote }}
+            - name: PYROSCOPE_PROFILER_LOCK
+              value: {{ .Values.profiling.pyroscope.lock | quote }}
+            # Same identity labels the other signals carry, so profiles join
+            # metrics/traces/logs on service_name + service_namespace.
+            - name: PYROSCOPE_LABELS
+              value: "service_namespace={{ .Values.observability.serviceNamespace }},service_version={{ .Values.observability.version }},deployment_environment={{ .Values.observability.environment }}"
             {{- end }}
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
