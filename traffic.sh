@@ -145,7 +145,8 @@ scenario_order() {
 
     # Place order
     local data="{\"product_id\": ${product_id}, \"quantity\": ${quantity}, \"user_id\": \"${user_id}\"}"
-    local status=$(request "$ORDERS_HOST" "/api/orders" "POST" "$data")
+    local status
+    status=$(request "$ORDERS_HOST" "/api/orders" "POST" "$data")
 
     if [[ "$status" == "201" ]]; then
         ((successful_orders++)) || true
@@ -157,7 +158,8 @@ scenario_order() {
 # Check order status
 scenario_order_status() {
     local user_id="user-$((RANDOM % 50 + 1))"
-    local order_id=$(printf "ORD-%05d" $((RANDOM % 100 + 1)))
+    local order_id
+    order_id=$(printf "ORD-%05d" $((RANDOM % 100 + 1)))
 
     request "$ORDERS_HOST" "/api/orders/${order_id}" > /dev/null
     request "$ORDERS_HOST" "/api/orders/user/${user_id}" > /dev/null
@@ -183,7 +185,8 @@ scenario_burst() {
     for _ in {1..3}; do
         local user_id="burst-$((RANDOM % 100))"
         local data="{\"product_id\": ${product_id}, \"quantity\": 1, \"user_id\": \"${user_id}\"}"
-        local status=$(request "$ORDERS_HOST" "/api/orders" "POST" "$data")
+        local status
+        status=$(request "$ORDERS_HOST" "/api/orders" "POST" "$data")
         if [[ "$status" == "201" ]]; then
             ((successful_orders++)) || true
         fi
@@ -202,7 +205,8 @@ scenario_shipping() {
     ((quotes_requested++)) || true
 
     if (( RANDOM % 2 == 0 )); then
-        local order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
+        local order_id
+        order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
         local ship_data="{\"order_id\": \"${order_id}\", \"origin\": \"${origin}\", \"destination\": \"${dest}\", \"weight\": ${weight}}"
         request "$SHIPPING_HOST" "/api/shipping/create" "POST" "$ship_data" > /dev/null
         ((shipments_created++)) || true
@@ -211,10 +215,12 @@ scenario_shipping() {
 
 # Track an existing shipment
 scenario_track_shipment() {
-    local tracking_id=$(printf "SHP-%05d" $((RANDOM % 500 + 1)))
+    local tracking_id
+    tracking_id=$(printf "SHP-%05d" $((RANDOM % 500 + 1)))
     request "$SHIPPING_HOST" "/api/shipping/track/${tracking_id}" > /dev/null
 
-    local order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
+    local order_id
+    order_id=$(printf "ORD-%05d" $((RANDOM % 1000 + 1)))
     request "$SHIPPING_HOST" "/api/shipping/order/${order_id}" > /dev/null
 }
 

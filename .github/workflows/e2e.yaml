@@ -1,0 +1,51 @@
+# Full end-to-end gate: boots the real demo (kind + setup.sh) on a GitHub
+# runner and passes only if check.sh sees all four signals. Too slow (~20 min)
+# and too heavy to run on every PR, so it runs on demand and weekly; promote it
+# to a PR gate once it has a stable track record.
+name: E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: kind + setup.sh + check.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.4
+
+      - name: Install kind
+        run: |
+          curl -sSfLo /usr/local/bin/kind \
+            https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64
+          chmod +x /usr/local/bin/kind
+
+      - name: Install helmfile
+        run: |
+          curl -sSfL https://github.com/helmfile/helmfile/releases/download/v0.171.0/helmfile_0.171.0_linux_amd64.tar.gz \
+            | tar xz -C /usr/local/bin helmfile
+
+      - name: Run full setup
+        run: ./setup.sh
+
+      - name: Readiness gate (4 signals)
+        run: |
+          export KUBECONFIG="$PWD/kind/.kube/config"
+          ./check.sh
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          export KUBECONFIG="$PWD/kind/.kube/config"
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by=.lastTimestamp | tail -50 || true

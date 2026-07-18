@@ -1,5 +1,6 @@
 # On-Premise Observability Stack
 
+[![CI](https://github.com/jsalvarredy/grafana-otel-demo/actions/workflows/ci.yaml/badge.svg)](https://github.com/jsalvarredy/grafana-otel-demo/actions/workflows/ci.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.33-326CE5?logo=kubernetes&logoColor=white)](kind/.kind/config.yaml)
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-native-425CC7?logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)

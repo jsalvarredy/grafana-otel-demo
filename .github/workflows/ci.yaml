@@ -1,0 +1,115 @@
+# CI validation pipeline — every check here can also be run locally (see
+# CONTRIBUTING.md). Jobs are independent so a failure pinpoints the layer:
+# shell scripts, Helm charts, Prometheus rules, dashboards, images, or security.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Shell scripts drive the whole demo (setup/traffic/incident/check); a
+  # quoting bug here breaks the PoC harder than a bad dashboard.
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck (severity >= warning)
+        run: shellcheck --severity=warning ./*.sh
+
+  helm:
+    name: Helm lint + kubeconform
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chart: [frontend-app, otel-demo-app, otel-python-app, shipping-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.4
+      - name: helm lint
+        run: helm lint "charts/${{ matrix.chart }}"
+      - name: Install kubeconform
+        run: |
+          curl -sSfL https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+      - name: helm template | kubeconform (strict)
+        run: |
+          helm template "${{ matrix.chart }}" "charts/${{ matrix.chart }}" \
+            | kubeconform -strict -summary -kubernetes-version 1.33.0
+
+  # The SLO recording rules live inside the Prometheus chart values
+  # (serverFiles), so they are extracted with yq before promtool sees them.
+  promtool:
+    name: Promtool check rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract recording rules from values
+        run: yq '.serverFiles["recording_rules.yml"]' kind/values/prometheus.yaml > /tmp/recording_rules.yml
+      - name: promtool check rules
+        run: |
+          docker run --rm -v /tmp/recording_rules.yml:/rules.yml:ro \
+            --entrypoint promtool prom/prometheus:v3.4.1 check rules /rules.yml
+
+  # Each dashboard ConfigMap embeds the dashboard as a JSON string; a stray
+  # comma only surfaces as a silent provisioning failure in Grafana, so parse
+  # every payload here instead.
+  dashboards:
+    name: Dashboard JSON validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every dashboard ConfigMap payload parses as JSON
+        run: |
+          fail=0
+          for f in kind/dashboards/*.yaml; do
+            keys=$(yq -r '.data | keys | .[]' "$f")
+            for k in $keys; do
+              if ! yq -r ".data[\"$k\"]" "$f" | python3 -m json.tool > /dev/null; then
+                echo "::error file=$f::invalid JSON in data key '$k'"
+                fail=1
+              fi
+            done
+          done
+          exit $fail
+
+  build:
+    name: Docker build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: products-service
+            context: src/otel-app
+          - service: orders-service
+            context: src/otel-python-app
+          - service: shipping-service
+            context: src/shipping-service
+          - service: frontend-service
+            context: src/frontend-app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (no push)
+        run: docker build -t "${{ matrix.service }}:ci" "${{ matrix.context }}"
+
+  # Report-only for now: the demo knowingly runs relaxed (kind, no
+  # NetworkPolicies, partial securityContext — see SECURITY.md). Flip
+  # exit-code to 1 once the hardening backlog in CLAUDE.md lands.
+  trivy:
+    name: Trivy config scan (report only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '0'
