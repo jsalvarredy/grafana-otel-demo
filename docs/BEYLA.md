@@ -1,6 +1,6 @@
 # Beyla eBPF Auto-Instrumentation
 
-This document explains how Grafana's **Beyla** auto-instruments the Shipping Service without touching application code.
+Grafana **Beyla** uses eBPF to auto-instrument the Shipping Service without touching application code.
 
 > **Default vs opt-in.** Out of the box the Shipping Service is auto-instrumented
 > by the **OpenTelemetry Java agent** (bytecode injection, baked into the image),

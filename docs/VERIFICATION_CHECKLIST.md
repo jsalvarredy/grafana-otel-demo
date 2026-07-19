@@ -1,7 +1,5 @@
 # Metrics Verification Checklist
 
-## ✅ Verification Status
-
 Use this checklist to verify all metrics are working correctly.
 
 ---
@@ -288,7 +286,7 @@ kubectl port-forward -n monitoring svc/prometheus-server 9090:80
 
 ## 7. Success Criteria
 
-✅ **Metrics are working if:**
+**Metrics are working if:**
 
 1. At least 10 different metric names appear in Prometheus
 2. Executive Dashboard shows data in > 80% of panels
@@ -300,27 +298,19 @@ kubectl port-forward -n monitoring svc/prometheus-server 9090:80
 
 ## 8. Next Steps After Verification
 
-Once all checks pass:
+The stack ships provisioned Grafana alerts (error rate, P95 latency,
+multi-window SLO burn rate, service down and synthetic probe down). Once the
+checks pass, adapt it to your environment:
 
-1. **Make changes permanent:**
-   - Rebuild Docker images with corrected code
-   - Update Helm chart values
-   - Push images to registry
-
-2. **Add alerting:**
-   - Configure AlertManager
-   - Create alert rules for critical metrics
-   - Set up notification channels (Slack, email)
-
-3. **Expand metrics:**
-   - Add database performance metrics
-   - Add cache hit/miss ratios
-   - Add custom business KPIs
-
-4. **Optimize:**
-   - Tune histogram buckets for your latency SLOs
-   - Adjust metric cardinality if needed
-   - Implement sampling for high-volume services
+1. **Route alerts**: add Grafana contact points (Slack, PagerDuty, email) and
+   point the provisioned alert rules at them.
+2. **Tune SLOs**: adjust targets and thresholds in the recording rules
+   (`kind/values/prometheus.yaml`) and the Grafana alert definitions to match
+   your objectives.
+3. **Add metrics**: instrument database and cache calls, and add business KPIs
+   beyond the demo set.
+4. **Tune cardinality**: size histogram buckets for your latency SLOs and cap
+   label cardinality against your retention budget.
 
 ---
 

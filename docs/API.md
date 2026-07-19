@@ -1,6 +1,6 @@
 # API Reference
 
-This document describes the REST APIs exposed by the demo microservices.
+REST APIs exposed by the three demo microservices.
 
 ## Products Service (Node.js)
 
@@ -174,7 +174,7 @@ sum(rate(http_requests_total[5m])) by (exported_job)
 sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
 
 # p95 latency
-histogram_quantile(0.95, sum(rate(http_server_duration_bucket[5m])) by (le, endpoint))
+histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, endpoint))
 
 # Cache hit ratio
 cache_hit_ratio{cache_name="product_cache"}

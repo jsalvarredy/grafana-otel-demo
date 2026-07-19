@@ -175,7 +175,7 @@ done
 
 ## Monitoring the Monitoring Stack
 
-Yes, you need to monitor your monitoring infrastructure:
+The observability stack needs its own monitoring:
 
 1. **Alertmanager** for critical alerts
 2. **Uptime checks** for Grafana endpoint
@@ -196,6 +196,4 @@ Key metrics to watch:
 3. **Plan storage backend** (S3, GCS, etc.)
 4. **Set up CI/CD** for Helm deployments
 5. **Configure alerting rules**
-
-
 
