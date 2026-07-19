@@ -11,7 +11,7 @@ figures are public list prices (verify current pricing with the vendor).
 | Solution | Annual Cost | Data Location |
 |----------|-------------|---------------|
 | Datadog | $36,000 list / $45,000-75,000 as typically billed | Datadog cloud |
-| NewRelic | $35,000-60,000 (mostly user seats) | NewRelic cloud |
+| New Relic | $35,000-60,000 (mostly user seats) | New Relic cloud |
 | Self-hosted (this stack) | $8,400 infrastructure + operations (see below) | Your infrastructure |
 
 The honest summary: with an existing platform team absorbing operations,
@@ -30,7 +30,7 @@ that stays flat as you grow while vendor pricing scales linearly.
 |--------|-------------|--------------|-------------|
 | Datadog | $15/host/mo (Pro) | $750 | $9,000 |
 | Datadog | $23/host/mo (Enterprise) | $1,150 | $13,800 |
-| NewRelic | $0.25/GB ingested | Varies | $6,000-12,000 |
+| New Relic | $0.25/GB ingested | Varies | $6,000-12,000 |
 | Self-hosted | Prometheus | $0 licensing | $0 licensing |
 
 ### Log Management (100GB/month)
@@ -38,7 +38,7 @@ that stays flat as you grow while vendor pricing scales linearly.
 | Vendor | Price Model | Monthly Cost | Annual Cost |
 |--------|-------------|--------------|-------------|
 | Datadog | $0.10/GB ingested + $1.70/M indexed | ~$270 | ~$3,240 |
-| NewRelic | $0.30/GB | $30 | $360 |
+| New Relic | $0.30/GB | $30 | $360 |
 | Splunk | $150/GB/day indexed | ~$4,500 | ~$54,000 |
 | Self-hosted | Loki | $0 licensing | $0 licensing |
 
@@ -47,7 +47,7 @@ that stays flat as you grow while vendor pricing scales linearly.
 | Vendor | Price Model | Monthly Cost | Annual Cost |
 |--------|-------------|--------------|-------------|
 | Datadog | $31/host/mo | $1,550 | $18,600 |
-| NewRelic | Included with Pro | - | - |
+| New Relic | Included with Pro | - | - |
 | Dynatrace | ~$69/host/mo | $3,450 | $41,400 |
 | Self-hosted | Tempo | $0 licensing | $0 licensing |
 
@@ -59,7 +59,7 @@ once RUM, synthetic monitoring, custom metrics and ingest overages are added;
 those SKUs are billed separately and are where most Datadog invoice surprises
 come from.
 
-**NewRelic** prices by data + user seats, not hosts — and seats dominate:
+**New Relic** prices by data + user seats, not hosts — and seats dominate:
 
 | Item | Price Model | Annual Cost |
 |------|-------------|-------------|
@@ -68,14 +68,14 @@ come from.
 | **Total** | | **~$43,000-51,000** |
 
 The $35,000-60,000 range in the summary covers 8-14 full-platform users.
-The per-GB tables above understate NewRelic if you ignore seats.
+The per-GB tables above understate New Relic if you ignore seats.
 
 ### Data Retention
 
 | Vendor | Default Retention | Extended Retention |
 |--------|-------------------|-------------------|
 | Datadog | 15 days | $$$$ |
-| NewRelic | 8 days | $1.50/GB/month |
+| New Relic | 8 days | $1.50/GB/month |
 | This Stack | You decide — bounded by your storage | Object storage, ~$0.02/GB/month |
 
 > Note: this demo ships with 15-day metrics retention and ephemeral
@@ -140,7 +140,7 @@ $2,000/month ($120k/year loaded cost — adjust to your market).
 |----------|--------|--------|--------|-------|
 | Datadog Enterprise (list price) | $35,600 | $35,600 | $35,600 | ~$107,000 |
 | Datadog (typical bill: RUM, synthetics, custom metrics, overages) | | | | $135,000-225,000 |
-| NewRelic Pro (12 full-platform users + data) | $48,000 | $48,000 | $48,000 | $144,000 |
+| New Relic Pro (12 full-platform users + data) | $48,000 | $48,000 | $48,000 | $144,000 |
 | Self-hosted — cash, existing platform team | $28,400 | $8,400 | $8,400 | **~$45,000** |
 | Self-hosted — imputing 0.2 FTE dedicated ops | $52,400 | $32,400 | $32,400 | ~$117,000 |
 

@@ -17,7 +17,7 @@ Complete observability with Grafana, Prometheus, Loki, and Tempo. Open source. N
 
 ## Why This Exists
 
-Datadog and NewRelic solve observability well. They also cost $35,000-75,000/year for 50 hosts with APM ([the math](docs/COST_ANALYSIS.md)), send all your telemetry to their cloud, and lock you into their ecosystem.
+Datadog and New Relic solve observability well. They also cost $35,000-75,000/year for 50 hosts with APM ([the math](docs/COST_ANALYSIS.md)), send all your telemetry to their cloud, and lock you into their ecosystem.
 
 If any of these apply to you, keep reading:
 
@@ -31,14 +31,14 @@ If you are evaluating this as a Datadog or New Relic alternative, start with [FO
 
 ## What You Get
 
-| Capability | This Stack | Datadog | NewRelic |
+| Capability | This Stack | Datadog | New Relic |
 |------------|------------|---------|----------|
 | Infrastructure metrics | Prometheus | $15-23/host/mo | $0.25/GB |
 | Log aggregation | Loki | $0.10/GB + indexing | $0.30/GB |
 | Distributed tracing | Tempo | $31/host/mo | Included (limits apply) |
 | Dashboards | Grafana | Included | Included |
 | Data retention | You decide — bounded by your storage | 15 days default | 8 days default |
-| Data location | Your infrastructure | Datadog cloud | NewRelic cloud |
+| Data location | Your infrastructure | Datadog cloud | New Relic cloud |
 | Licensing cost | $0 | $$$ | $$$ |
 
 ## Quick Start
@@ -64,7 +64,7 @@ The demo includes three instrumented microservices (Node.js, Python, and Java) t
 | Vendor | Infrastructure | Logs | APM | Total |
 |--------|---------------|------|-----|-------|
 | Datadog Enterprise | $13,800 | $3,240 | $18,600 | ~$35,640/yr |
-| NewRelic Pro | $6,000 | $360 | Included | ~$20,000/yr |
+| New Relic Pro | $6,000 | $360 | Included | ~$20,000/yr |
 | This Stack | $0 licensing | $0 licensing | $0 licensing | Infrastructure only |
 
 Self-hosted infrastructure cost (AWS example): ~$350/month for a production setup supporting 50 hosts.
