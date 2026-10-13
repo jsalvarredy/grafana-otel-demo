@@ -152,19 +152,50 @@ Beyla automatically generates RED metrics:
 - `url_path` - Request path
 - `service_name` - Service name
 
-### Differences vs the HTTP contract (C1)
+### Matching the HTTP contract (C1)
 
-Not run for this change; based on Beyla's documented behaviour, to be checked
-when Beyla is enabled:
+By default Beyla labels requests with `url_path` (raw path, high cardinality)
+and only sets `http_route` when route patterns are configured. The chart
+therefore renders a Beyla config file (ConfigMap `<release>-beyla`, mounted at
+`/etc/beyla/beyla-config.yml` and loaded via `BEYLA_CONFIG_PATH`) because route
+patterns, the unmatched-route mode and histogram buckets have no env var
+equivalent in Beyla 3.x:
 
-- Metric name, unit (seconds), `http_request_method` and
-  `http_response_status_code` match the Java agent / Node / Python family.
-- Beyla labels requests with `url_path` (raw path, high cardinality) and only
-  sets `http_route` when route patterns are configured (`BEYLA_ROUTES_*`); the
-  contract requires a templated `http_route` and no raw paths.
-- No `url_scheme` label by default, and no trace-based exemplars from Beyla.
-- Bucket boundaries are Beyla's own defaults, not the C1 advisory list; confirm
-  they include 0.25 and 1 so Apdex works.
+```yaml
+routes:
+  patterns:            # taken from ShippingController
+    - /api/
+    - /api/shipping/quote
+    - /api/shipping/create
+    - /api/shipping/track/{trackingId}
+    - /api/shipping/order/{orderId}
+    - /api/slow
+    - /api/error
+  unmatched: heuristic # anything else is templatized, never exported raw
+  ignored_patterns: [/api/health, /health]
+otel_metrics_export:
+  buckets:
+    duration_histogram: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
+```
+
+Result: shipping-service emits a templated `http_route` (e.g.
+`/api/shipping/track/{trackingId}`) and no raw-path label, and the duration
+histogram includes the 0.25 and 1 boundaries Apdex needs. Metric name, unit
+(seconds), `http_request_method` and `http_response_status_code` already match
+the Java agent / Node / Python family.
+
+Verification status: configuration only. `helm template` renders the
+ConfigMap/volume, and `grafana/beyla:3.24.0` accepts the file at startup, but
+the eBPF path could not be exercised without a BTF kernel, so the emitted label
+set is not observed end to end. Known remaining differences: no `url_scheme`
+label by default and no trace-based exemplars from Beyla (check.sh downgrades
+the missing shipping exemplars to a warning when the `beyla` sidecar is present).
+
+### Instrumentation scope name
+
+Beyla 3.x metrics carry `otel_scope_name="go.opentelemetry.io/obi"` (the OBI
+meter name; it does **not** contain "beyla"). The Executive dashboard splits
+"SDK/agent vs Beyla" on exactly that value.
 
 ## Traces captured by Beyla
 

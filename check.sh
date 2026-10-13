@@ -171,17 +171,17 @@ fi
 # ---------------------------------------------------------------------------
 section "Metrics signal (RED)"
 # ---------------------------------------------------------------------------
-for svc in products-service orders-service; do
-  v=$(promq "count(http_requests_total{service_name=\"$svc\"})")
-  if ge1 "$v"; then ok "SDK metrics present: $svc"; else bad "No http_requests_total for $svc"; fi
+# Single stable HTTP family (semconv C1) for all three services: SDK (Products,
+# Orders), OTel Java agent or Beyla (Shipping) all emit the same metric.
+for svc in products-service orders-service shipping-service; do
+  v=$(promq "count(http_server_request_duration_seconds_count{service_name=\"$svc\"})")
+  b=$(promq "count(http_server_request_duration_seconds_bucket{service_name=\"$svc\"})")
+  if ge1 "$v" && ge1 "$b"; then
+    ok "http_server_request_duration_seconds present: $svc"
+  else
+    bad "No http_server_request_duration_seconds_{count,bucket} for $svc (instrumentation down? Beyla without BTF?)"
+  fi
 done
-# Shipping is the P0 fix: it must now emit via the OTel Java agent (any kernel).
-vs=$(promq 'count(http_server_request_duration_seconds_count{service_name="shipping-service"})')
-if ge1 "$vs"; then
-  ok "shipping-service emitting HTTP metrics (OTel Java agent)"
-else
-  bad "shipping-service has NO HTTP metrics (Java agent down? Beyla without BTF?)"
-fi
 
 # ---------------------------------------------------------------------------
 section "Traces signal & Service Map"
@@ -216,19 +216,28 @@ done
 # ---------------------------------------------------------------------------
 section "Correlation: exemplars (metric → trace)"
 # ---------------------------------------------------------------------------
-# Exemplars come from Tempo's span metrics (metrics-generator remote-writes
-# them with send_exemplars: true) - that is what the APM latency panels use.
-# The apps' own JS histograms carry none: the OTel JS SDK does not wire
-# OTEL_METRICS_EXEMPLAR_FILTER yet (unlike Java/Python).
-ex=""
-for fam in traces_spanmetrics_latency_bucket http_server_duration_milliseconds_bucket; do
-  ex=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
-    --data-urlencode "query=$fam" \
+# Span-metrics exemplars (Tempo metrics-generator) drive the APM latency panels;
+# the app family (http_server_request_duration_seconds) must carry them too.
+# Orders (Python) and Shipping (Java agent) are required; Products (Node SDK)
+# does not wire exemplars yet, so it is not checked.
+exemplar_for(){
+  curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
+    --data-urlencode "query=$1" \
     --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null \
-    | grep -oE '"traceID":"[a-f0-9]+"' | head -1)
-  [ -n "$ex" ] && break
+    | grep -oE '"traceID":"[a-f0-9]+"' | head -1
+}
+ex=$(exemplar_for traces_spanmetrics_latency_bucket)
+if [ -n "$ex" ]; then ok "Exemplars present on span metrics"; else warn "No span-metrics exemplars in last 15m (need traffic with sampled traces)"; fi
+for svc in orders-service shipping-service; do
+  ex=$(exemplar_for "http_server_request_duration_seconds_bucket{service_name=\"$svc\"}")
+  if [ -n "$ex" ]; then
+    ok "Exemplars present on http_server_request_duration_seconds_bucket: $svc"
+  elif [ "$svc" = "shipping-service" ] && kubectl get deploy shipping-service -n demo -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null | grep -qw beyla; then
+    warn "No app-family exemplars for shipping-service (Beyla does not emit exemplars)"
+  else
+    bad "No exemplars on http_server_request_duration_seconds_bucket for $svc in last 15m"
+  fi
 done
-if [ -n "$ex" ]; then ok "Exemplars present on latency metrics (span metrics)"; else warn "No exemplars in last 15m (need traffic with sampled traces)"; fi
 
 # ---------------------------------------------------------------------------
 section "Drilldown apps (queryless)"

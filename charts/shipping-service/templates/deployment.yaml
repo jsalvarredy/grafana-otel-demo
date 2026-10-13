@@ -156,9 +156,10 @@ spec:
               value: "{{ .Values.beyla.otelEndpoint }}"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
               value: "http/protobuf"
-            # Exclude health check endpoints from traces and metrics (K8s probes noise)
-            - name: BEYLA_ROUTES_IGNORE_PATTERNS
-              value: "/api/health,/health"
+            # Route patterns, unmatched-route mode, ignored health endpoints and
+            # histogram buckets live in the mounted config file (no env vars).
+            - name: BEYLA_CONFIG_PATH
+              value: /etc/beyla/beyla-config.yml
             # Disable Beyla's internal traces (only export application traces)
             - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_FEATURES
               value: "application"
@@ -170,6 +171,10 @@ spec:
               value: "0"
             - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_PORT
               value: "0"
+          volumeMounts:
+            - name: beyla-config
+              mountPath: /etc/beyla
+              readOnly: true
           ports:
             - name: beyla-metrics
               containerPort: 9090
@@ -185,3 +190,9 @@ spec:
               cpu: 100m
               memory: 256Mi
         {{- end }}
+      {{- if .Values.beyla.enabled }}
+      volumes:
+        - name: beyla-config
+          configMap:
+            name: {{ include "shipping-service.fullname" . }}-beyla
+      {{- end }}
