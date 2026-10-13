@@ -60,7 +60,7 @@ SHIPPING_HOST="shipping.127.0.0.1.nip.io"
 HEALTHY_WORKERS=2
 ERROR_WORKERS=3
 LATENCY_WORKERS=6
-SLOW_DELAY_MS=1500         # per slow request; >> 500ms P95 threshold
+SLOW_DELAY_MS=1500         # per slow request; >> 1s P95 threshold
 
 usage() {
   cat <<EOF

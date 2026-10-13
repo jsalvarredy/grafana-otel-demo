@@ -436,9 +436,10 @@ make_request() {
 
 # Simulate realistic e-commerce traffic across ALL services.
 # The seeded anomalies are deliberately sub-threshold so alerts stay silent at
-# rest: exactly one /error per service and one /api/slow over the whole run,
-# diluted by ~1700 healthy requests (5xx ratio ~0.2% < 0.3%, slow < 0.1% < 2%).
-# They still leave one error trace per service and one slow trace in Tempo.
+# rest: exactly ONE deliberate 5xx (products /error) and ONE /api/slow over the
+# whole run, diluted by ~1675 healthy requests (5xx ratio ~0.06%, well under
+# the 0.6% slow-burn line; slow < 0.1%). They still leave one error trace and
+# one slow trace in Tempo.
 # Use ./incident.sh to fire the alerts on purpose.
 SEED_ITERATIONS=150
 for i in $(seq 1 "$SEED_ITERATIONS"); do
@@ -450,8 +451,7 @@ for i in $(seq 1 "$SEED_ITERATIONS"); do
     product_id=$((RANDOM % 8 + 1))
     make_request "products.127.0.0.1.nip.io" "/api/products/${product_id}"
 
-    # Orders service: healthy read traffic every iteration so its own error
-    # ratio stays low even with the single seeded /error.
+    # Orders service: healthy read traffic every iteration.
     make_request "orders.127.0.0.1.nip.io" "/"
     make_request "orders.127.0.0.1.nip.io" "/api/stats"
     make_request "orders.127.0.0.1.nip.io" "/api/orders/user/user-$((RANDOM % 20 + 1))"
@@ -484,12 +484,10 @@ for i in $(seq 1 "$SEED_ITERATIONS"); do
     # Shipping service info endpoint
     make_request "shipping.127.0.0.1.nip.io" "/api/"
 
-    # One slow request and one error per service, mid-run (see comment above).
+    # One slow request and one 5xx in total, mid-run (see comment above).
     if (( i == SEED_ITERATIONS / 2 )); then
         make_request "shipping.127.0.0.1.nip.io" "/api/slow"
         make_request "products.127.0.0.1.nip.io" "/error"
-        make_request "orders.127.0.0.1.nip.io" "/error"
-        make_request "shipping.127.0.0.1.nip.io" "/api/error"
     fi
 
     # Progress indicator
