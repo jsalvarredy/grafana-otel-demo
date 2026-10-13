@@ -95,6 +95,30 @@ beyla:
   # Service identity comes from observability.serviceName.
   # Grafana Alloy (OTLP gateway) endpoint
   otelEndpoint: "http://alloy.monitoring.svc.cluster.local:4318"
+  # Route templating (semantic-conventions contract C1: low-cardinality
+  # http.route, no raw paths). Beyla only sets http_route when patterns match,
+  # otherwise it falls back to the raw url_path, so the shipping-service routes
+  # (see ShippingController) are listed explicitly. Rendered into a ConfigMap
+  # and loaded with BEYLA_CONFIG_PATH; these keys have no env var equivalent.
+  routes:
+    patterns:
+      - /api/
+      - /api/shipping/quote
+      - /api/shipping/create
+      - /api/shipping/track/{trackingId}
+      - /api/shipping/order/{orderId}
+      - /api/slow
+      - /api/error
+    # "heuristic" templatizes anything not listed above instead of exporting
+    # the raw path, so an unexpected URL can never become a label value.
+    unmatched: heuristic
+    ignoredPatterns:
+      - /api/health
+      - /health
+  # Duration histogram buckets in seconds, aligned with the advisory list the
+  # SDK/agent services use (includes the 0.25 and 1 SLO thresholds).
+  buckets:
+    duration: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
 
 # Extra environment variables for the app container (merged with the agent vars).
 env: {}
