@@ -77,21 +77,21 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
   semconv estable del Java agent (`http_server_request_duration_seconds*`).
   Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
-- Exemplars: activados vía `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` en las
-  apps y `send_exemplars: true` en el remote write de Alloy; Prometheus corre
-  con `enable-feature=exemplar-storage`. Verificado (repro local con
-  Alloy 1.10.0 + Prometheus 3.5 + Java agent): `otelcol.exporter.prometheus`
-  → `prometheus.remote_write` SÍ conserva los exemplars (en las series
-  `_bucket`, con `trace_id`/`span_id`); no hace falta cambiar de exportador.
-  Si una app no muestra exemplars, es que su SDK no los emite (Node/Python),
-  no que Alloy/Prometheus los descarten. Con tail sampling al 100% (demo) todo
-  exemplar apunta a una traza conservada; si se baja el porcentaje, un exemplar
-  puede apuntar a una traza descartada (errores y lentas >=500ms siempre se
-  conservan).
-- Logs duplicados: pods que exportan logs por OTLP (con trace_id/span_id)
-  llevan la annotation `observability.mikroways.net/logs: otlp` y `alloy-logs`
-  los descarta del tail de stdout (shipping con Java agent, products y orders).
-  Shipping con Beyla (sin logs OTLP) no lleva la annotation y sigue por stdout.
+- Exemplars: enabled via `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` in the
+  apps and `send_exemplars: true` in Alloy's remote write; Prometheus runs
+  with `enable-feature=exemplar-storage`. Verified (local repro with Alloy
+  1.10.0 + Prometheus 3.5 + Java agent): `otelcol.exporter.prometheus` ->
+  `prometheus.remote_write` DOES keep exemplars (on the `_bucket` series, with
+  `trace_id`/`span_id`), so there is no need to change exporter. If an app
+  shows no exemplars, its SDK is not emitting them (Node/Python); Alloy and
+  Prometheus are not dropping them. With tail sampling at 100% (demo) every
+  exemplar points to a kept trace; if the percentage is lowered, an exemplar
+  may point to a dropped trace (errors and slow >=500ms traces are always kept).
+- Duplicated logs: pods that export logs over OTLP (with trace_id/span_id)
+  carry the pod annotation `observability.mikroways.net/logs: otlp` and
+  `alloy-logs` drops them from the stdout tail (shipping with the Java agent,
+  products and orders). Shipping with Beyla (no OTLP logs) has no annotation
+  and keeps flowing through stdout.
 - Tempo: `overrides.defaults.metrics_generator.processors` habilita
   service-graphs, span-metrics y local-blocks. En Tempo 2.8
   `overrides.defaults.search` NO existe (error "field defaults not found").
@@ -108,6 +108,10 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 ## Problemas conocidos
 - Beyla sidecar requiere `privileged: true` y kernel con BTF (CONFIG_DEBUG_INFO_BTF=y)
 - Loki gateway da 502 transitorio durante startup (se resuelve solo con retry)
+- Node/Python app metrics carry no exemplars: the JS SDK does not wire
+  `OTEL_METRICS_EXEMPLAR_FILTER` (the env var is a no-op in Node). The Alloy ->
+  Prometheus path already carries exemplars (verified with the Java agent); this
+  is fixed in the app instrumentation.
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)
