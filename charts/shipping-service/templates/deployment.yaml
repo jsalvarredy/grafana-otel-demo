@@ -22,6 +22,11 @@ spec:
         observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
         observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
         observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
+        {{- if .Values.instrumentation.javaAgent.enabled }}
+        # Logs of this pod reach Loki via OTLP (with trace_id/span_id); alloy-logs
+        # drops its stdout copy to avoid duplicated lines.
+        observability.mikroways.net/logs: otlp
+        {{- end }}
         {{- if .Values.beyla.enabled }}
         # Annotation to indicate Beyla auto-instrumentation
         instrumentation.beyla.io/enabled: "true"

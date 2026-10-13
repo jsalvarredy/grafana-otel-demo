@@ -79,7 +79,19 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
 - Exemplars: activados vía `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` en las
   apps y `send_exemplars: true` en el remote write de Alloy; Prometheus corre
-  con `enable-feature=exemplar-storage`.
+  con `enable-feature=exemplar-storage`. Verificado (repro local con
+  Alloy 1.10.0 + Prometheus 3.5 + Java agent): `otelcol.exporter.prometheus`
+  → `prometheus.remote_write` SÍ conserva los exemplars (en las series
+  `_bucket`, con `trace_id`/`span_id`); no hace falta cambiar de exportador.
+  Si una app no muestra exemplars, es que su SDK no los emite (Node/Python),
+  no que Alloy/Prometheus los descarten. Con tail sampling al 100% (demo) todo
+  exemplar apunta a una traza conservada; si se baja el porcentaje, un exemplar
+  puede apuntar a una traza descartada (errores y lentas >=500ms siempre se
+  conservan).
+- Logs duplicados: pods que exportan logs por OTLP (con trace_id/span_id)
+  llevan la annotation `observability.mikroways.net/logs: otlp` y `alloy-logs`
+  los descarta del tail de stdout (shipping con Java agent, products y orders).
+  Shipping con Beyla (sin logs OTLP) no lleva la annotation y sigue por stdout.
 - Tempo: `overrides.defaults.metrics_generator.processors` habilita
   service-graphs, span-metrics y local-blocks. En Tempo 2.8
   `overrides.defaults.search` NO existe (error "field defaults not found").
@@ -96,14 +108,6 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 ## Problemas conocidos
 - Beyla sidecar requiere `privileged: true` y kernel con BTF (CONFIG_DEBUG_INFO_BTF=y)
 - Loki gateway da 502 transitorio durante startup (se resuelve solo con retry)
-- Los logs del shipping-service llegan a Loki DUPLICADOS (verificado 2026-07):
-  una vez por el DaemonSet de stdout (sin trace_id) y otra por OTLP del Java
-  agent (CON trace_id/span_id). La correlación trace→log de Java funciona por
-  la vía OTLP; falta decidir/filtrar una de las dos vías (Bloque C del informe)
-- Exemplars: solo los produce el metrics-generator de Tempo (span metrics,
-  verificado). El SDK de JS no cablea OTEL_METRICS_EXEMPLAR_FILTER (la env es
-  no-op en Node); las familias que pasan por Alloy no muestran exemplars en
-  Prometheus — pendiente investigar la conversión otelcol.exporter.prometheus
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)

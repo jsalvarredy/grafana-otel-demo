@@ -29,6 +29,8 @@
 # Prometheus's remote-write receiver (already enabled for Tempo's span
 # metrics), so exemplars keep working end to end.
 #
+# Verified (Alloy 1.10 + Prometheus 3.5 + Java agent): exemplars arrive on `_bucket` series.
+#
 # alloy-logs (Fase 1, DaemonSet tailing pod stdout) is UNTOUCHED by this file.
 
 controller:
