@@ -69,6 +69,13 @@ Logs Search, Log Analysis, Executive, Observability Overview, SLO/SLI Error
 Budget, Synthetic Monitoring, Frontend/RUM, k6 Load Testing, K8s Cluster.
 Alertas provisionadas en Grafana (no Alertmanager): error rate, P95, SLO
 fast/slow burn (multi-window), service down, synthetic probe down.
+Alerts are expected to be SILENT at rest after `./setup.sh`: its seeded traffic
+(~1700 requests) contains exactly one `/error` per service and one `/api/slow`
+(5xx ratio ~0.2%, below half of the 6x slow-burn threshold; slow < 0.1%), which
+still leaves one error trace per service and one slow trace in Tempo. `check.sh`
+warm-up sends only healthy requests. To fire alerts on purpose, run
+`./incident.sh`; do not add error/slow calls to setup or check, and do not add
+route exclusions to rules or alerts.
 
 ## Decisiones técnicas que hay que conocer
 - Dashboards, recording rules and alerts query a SINGLE HTTP family
