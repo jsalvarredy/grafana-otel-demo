@@ -69,110 +69,46 @@ serverFiles:
       - name: slo_http_error_ratio
         interval: 30s
         rules:
-          # Canonical platform SLI. The SDK and Java-agent metric families have
-          # disjoint service_name sets, so they can be summed without double
-          # counting. `(total > 0)` keeps no-traffic periods absent instead of
-          # silently diluting low-volume errors with clamp_min(..., 1 req/s).
+          # Canonical platform SLI, from the single stable-semconv family
+          # (http.server.request.duration) that all three apps emit.
+          # `(total > 0)` keeps no-traffic periods absent instead of silently
+          # diluting low-volume errors with clamp_min(..., 1 req/s).
           - record: job:http_errors:ratio_rate5m
             expr: |
-              (
-                (sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) or vector(0))
-                +
-                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) or vector(0))
-              )
+              (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) or vector(0))
               /
-              (
-                (
-                  (sum(rate(http_requests_total[5m])) or vector(0))
-                  +
-                  (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0))
-                ) > 0
-              )
+              (sum(rate(http_server_request_duration_seconds_count[5m])) > 0)
           - record: job:http_errors:ratio_rate30m
             expr: |
-              (
-                (sum(rate(http_requests_total{http_status_code=~"5.."}[30m])) or vector(0))
-                +
-                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m])) or vector(0))
-              )
+              (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[30m])) or vector(0))
               /
-              (
-                (
-                  (sum(rate(http_requests_total[30m])) or vector(0))
-                  +
-                  (sum(rate(http_server_request_duration_seconds_count[30m])) or vector(0))
-                ) > 0
-              )
+              (sum(rate(http_server_request_duration_seconds_count[30m])) > 0)
           - record: job:http_errors:ratio_rate1h
             expr: |
-              (
-                (sum(rate(http_requests_total{http_status_code=~"5.."}[1h])) or vector(0))
-                +
-                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h])) or vector(0))
-              )
+              (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h])) or vector(0))
               /
-              (
-                (
-                  (sum(rate(http_requests_total[1h])) or vector(0))
-                  +
-                  (sum(rate(http_server_request_duration_seconds_count[1h])) or vector(0))
-                ) > 0
-              )
+              (sum(rate(http_server_request_duration_seconds_count[1h])) > 0)
           - record: job:http_errors:ratio_rate6h
             expr: |
-              (
-                (sum(rate(http_requests_total{http_status_code=~"5.."}[6h])) or vector(0))
-                +
-                (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h])) or vector(0))
-              )
+              (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[6h])) or vector(0))
               /
-              (
-                (
-                  (sum(rate(http_requests_total[6h])) or vector(0))
-                  +
-                  (sum(rate(http_server_request_duration_seconds_count[6h])) or vector(0))
-                ) > 0
-              )
+              (sum(rate(http_server_request_duration_seconds_count[6h])) > 0)
           - record: service:http_errors:ratio_rate5m
             expr: |
               (
-                (
-                  sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[5m]))
-                  or (sum by (service_name) (rate(http_requests_total[5m])) * 0)
-                )
-                or
-                (
-                  sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
-                  or (sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])) * 0)
-                )
+                sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+                or (sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])) * 0)
               )
               /
-              (
-                (
-                  sum by (service_name) (rate(http_requests_total[5m]))
-                  or sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
-                ) > 0
-              )
+              (sum by (service_name) (rate(http_server_request_duration_seconds_count[5m])) > 0)
           - record: service:http_errors:ratio_rate1h
             expr: |
               (
-                (
-                  sum by (service_name) (rate(http_requests_total{http_status_code=~"5.."}[1h]))
-                  or (sum by (service_name) (rate(http_requests_total[1h])) * 0)
-                )
-                or
-                (
-                  sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
-                  or (sum by (service_name) (rate(http_server_request_duration_seconds_count[1h])) * 0)
-                )
+                sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[1h]))
+                or (sum by (service_name) (rate(http_server_request_duration_seconds_count[1h])) * 0)
               )
               /
-              (
-                (
-                  sum by (service_name) (rate(http_requests_total[1h]))
-                  or sum by (service_name) (rate(http_server_request_duration_seconds_count[1h]))
-                ) > 0
-              )
+              (sum by (service_name) (rate(http_server_request_duration_seconds_count[1h])) > 0)
       - name: slo_http_burnrate
         interval: 30s
         rules:
@@ -199,20 +135,13 @@ serverFiles:
       # so we only need the CUMULATIVE histogram buckets at T and 4T — no
       # _sum/_count gymnastics, no quantile interpolation.
       #
-      # T = 250ms is chosen on purpose: 250ms (T) and 1000ms (4T) are EXACT
-      # bucket edges in BOTH metric families, so the score is precise:
-      #   * SDK apps (products, orders): http_server_duration_milliseconds_bucket
-      #       -> le="250"/"250.0"  (T)   and le="1000"/"1000.0" (4T)   [milliseconds]
-      #   * Java agent (shipping): http_server_request_duration_seconds_bucket
-      #       -> le="0.25"          (T)   and le="1"/"1.0"       (4T)    [seconds]
-      # NOTE on `le` formatting: different Prometheus exporters render integer
-      # bucket boundaries differently. The classic OTel Collector prometheus
-      # exporter added a trailing ".0" (le="250.0"); Grafana Alloy's
-      # otelcol.exporter.prometheus renders bare integers (le="250"). The
-      # `le=~"…"` regex matchers below accept BOTH ("250" or "250.0"), so the
-      # rules survive either exporter without edits. Non-integer edges (0.25)
-      # only ever have one representation.
-      # The two families have disjoint service_name sets, so `or` unions them.
+      # T = 250ms is chosen on purpose: 0.25 s (T) and 1 s (4T) are EXACT
+      # bucket edges of http_server_request_duration_seconds (the semconv
+      # advisory buckets, identical for all three apps), so the score is
+      # precise. The family is in SECONDS: T = le="0.25", 4T = le="1".
+      # NOTE on `le` formatting: exporters may render the integer boundary as
+      # "1" or "1.0", so 4T uses the regex `le=~"1(\.0+)?"` (a regex on ONE
+      # label, not a cross-family join). 0.25 has only one representation.
       # To retune T, pick new `le` values that are real bucket boundaries.
       # =====================================================================
       - name: apm_apdex
@@ -222,21 +151,15 @@ serverFiles:
           # Satisfied: requests served within T.
           - record: service:apdex_satisfied:rate5m
             expr: |
-              sum by (service_name) (rate(http_server_duration_milliseconds_bucket{le=~`250(\.0+)?`}[5m]))
-              or
               sum by (service_name) (rate(http_server_request_duration_seconds_bucket{le="0.25"}[5m]))
           # Tolerating boundary: requests served within 4T (this is le=4T, the
           # cumulative count of satisfied+tolerating — exactly what the formula needs).
           - record: service:apdex_tolerating:rate5m
             expr: |
-              sum by (service_name) (rate(http_server_duration_milliseconds_bucket{le=~`1000(\.0+)?`}[5m]))
-              or
               sum by (service_name) (rate(http_server_request_duration_seconds_bucket{le=~`1(\.0+)?`}[5m]))
           # Total requests (the +Inf bucket == _count).
           - record: service:apdex_total:rate5m
             expr: |
-              sum by (service_name) (rate(http_server_duration_milliseconds_count[5m]))
-              or
               sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
           # ---- Apdex score per service: (satisfied + tolerating) / (2 * total) ----
           # No clamp on the denominator: with no traffic the score is absent

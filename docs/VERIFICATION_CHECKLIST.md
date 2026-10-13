@@ -10,21 +10,21 @@ Access: **Grafana → Explore → Prometheus**
 
 ### Core Infrastructure Metrics
 
-- [ ] **http_requests_total** - HTTP request counter
+- [ ] **Request rate** - `http_server_request_duration_seconds_count`
   ```promql
-  sum(rate(http_requests_total[5m])) by (service_name)
+  sum(rate(http_server_request_duration_seconds_count[5m])) by (service_name)
   ```
-  **Expected:** 2 lines (products-service, orders-service)
+  **Expected:** 3 lines (products-service, orders-service, shipping-service)
 
-- [ ] **http_server_duration** - Request latency histogram
+- [ ] **Request latency histogram** (seconds, all three services)
   ```promql
-  histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, service_name))
+  histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name))
   ```
-  **Expected:** Values between 50-200ms typically
+  **Expected:** Values between 0.05-0.2 s typically
 
 - [ ] **Status code breakdown**
   ```promql
-  sum(rate(http_requests_total[5m])) by (service_name, http_status_code)
+  sum(rate(http_server_request_duration_seconds_count[5m])) by (service_name, http_response_status_code)
   ```
   **Expected:** Mostly 200s, some 404s, minimal 5xxs
 

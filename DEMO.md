@@ -107,7 +107,7 @@ This is the headline differentiator. **Open:** nav → **Drilldown** → **Metri
 > anyone can investigate — point and click."
 
 **Do:**
-1. **Metrics Drilldown:** pick `http_server_duration_milliseconds` → break it
+1. **Metrics Drilldown:** pick `http_server_request_duration_seconds_bucket` → break it
    down by `service_name` with one click. No query typed.
 2. **Logs Drilldown:** switch to Logs. Show log volume, then drill into
    `products-service` and let it surface error patterns automatically.

@@ -78,7 +78,7 @@ data:
           }
         ]
       },
-      "description": "New Relic-style APM for the demo services: Apdex, response time, throughput, error rate and a per-transaction breakdown \u2014 all from OpenTelemetry metrics in Prometheus. Pick a service with the Service variable.",
+      "description": "New Relic-style APM for the demo services: Apdex, response time, throughput, error rate and a per-transaction breakdown — all from OpenTelemetry metrics in Prometheus. Pick a service with the Service variable.",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
@@ -131,7 +131,7 @@ data:
           },
           "id": 2,
           "panels": [],
-          "title": "Service health \u2014 New Relic-style summary",
+          "title": "Service health — New Relic-style summary",
           "type": "row"
         },
         {
@@ -228,15 +228,15 @@ data:
                   },
                   {
                     "color": "yellow",
-                    "value": 250
+                    "value": 0.25
                   },
                   {
                     "color": "red",
-                    "value": 500
+                    "value": 0.5
                   }
                 ]
               },
-              "unit": "ms"
+              "unit": "s"
             },
             "overrides": []
           },
@@ -267,7 +267,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) * 1000 or vector(0))) / clamp_min((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1)",
+              "expr": "sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
               "refId": "A"
             }
           ],
@@ -327,7 +327,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0))) * 60",
+              "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) * 60",
               "refId": "A"
             }
           ],
@@ -395,7 +395,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1) * 100",
+              "expr": "((sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))) * 100",
               "refId": "A"
             }
           ],
@@ -436,7 +436,7 @@ data:
                 "showPoints": "never",
                 "spanNulls": false
               },
-              "unit": "ms",
+              "unit": "s",
               "mappings": []
             },
             "overrides": []
@@ -470,7 +470,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) * 1000 or vector(0))) / clamp_min((sum(rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1)",
+              "expr": "sum(rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
               "refId": "A",
               "legendFormat": "avg"
             },
@@ -479,27 +479,30 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "histogram_quantile(0.5, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.5, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])))",
               "refId": "B",
-              "legendFormat": "p50"
+              "legendFormat": "p50",
+              "exemplar": true
             },
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])))",
               "refId": "C",
-              "legendFormat": "p95"
+              "legendFormat": "p95",
+              "exemplar": true
             },
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "histogram_quantile(0.99, sum(rate(http_server_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le)) or (histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])) by (le)) * 1000)",
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"$service\"}[5m])))",
               "refId": "D",
-              "legendFormat": "p99"
+              "legendFormat": "p99",
+              "exemplar": true
             }
           ],
           "title": "Web transaction response time",
@@ -663,21 +666,12 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m]))",
-              "refId": "A",
-              "legendFormat": "{{endpoint}}"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
               "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
-              "refId": "B",
+              "refId": "A",
               "legendFormat": "{{http_route}}"
             }
           ],
-          "title": "Throughput by transaction",
+          "title": "Throughput by route",
           "type": "timeseries"
         },
         {
@@ -752,7 +746,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total{service_name=~\"$service\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) or vector(0)), 1) * 100",
+              "expr": "((sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\",service_name=~\"$service\"}[5m])) or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))) * 100",
               "refId": "A",
               "legendFormat": "error rate"
             }
@@ -778,7 +772,7 @@ data:
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "description": "Per-transaction breakdown. 'Time consumed' = rate of the response-time sum (throughput x avg) \u2014 the same ranking New Relic uses for 'most time consuming transactions'. Apdex is computed per transaction (T=250ms).",
+          "description": "Per-transaction breakdown. 'Time consumed' = rate of the response-time sum (throughput x avg) — the same ranking New Relic uses for 'most time consuming transactions'. Apdex is computed per transaction (T=250ms).",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -873,12 +867,12 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Avg resp (ms)"
+                  "options": "Avg resp"
                 },
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "ms"
+                    "value": "s"
                   },
                   {
                     "id": "decimals",
@@ -889,12 +883,12 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Time consumed (ms/s)"
+                  "options": "Time consumed (s/s)"
                 },
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "ms"
+                    "value": "s"
                   },
                   {
                     "id": "decimals",
@@ -932,7 +926,7 @@ data:
             "sortBy": [
               {
                 "desc": true,
-                "displayName": "Time consumed (ms/s)"
+                "displayName": "Time consumed (s/s)"
               }
             ]
           },
@@ -942,7 +936,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) * 60",
+              "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])) * 60",
               "refId": "A",
               "instant": true,
               "format": "table",
@@ -953,7 +947,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m]) * 1000), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) / clamp_min(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")), 0.0001)",
+              "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m])) / sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m]))",
               "refId": "B",
               "instant": true,
               "format": "table",
@@ -964,7 +958,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "(sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_bucket{le=~`250(\\.0+)?`,service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=\"0.25\",service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")) + sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_bucket{le=~`1000(\\.0+)?`,service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=\"1.0\",service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))) / (2 * sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"http_route\", \"(.+)\")))",
+              "expr": "(sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=\"0.25\",service_name=~\"$service\"}[5m])) + sum by (http_route) (rate(http_server_request_duration_seconds_bucket{le=~`1(\\.0+)?`,service_name=~\"$service\"}[5m]))) / (2 * sum by (http_route) (rate(http_server_request_duration_seconds_count{service_name=~\"$service\"}[5m])))",
               "refId": "C",
               "instant": true,
               "format": "table",
@@ -975,14 +969,14 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "sum by (transaction) (label_replace(sum by (endpoint) (rate(http_server_duration_milliseconds_sum{service_name=~\"$service\"}[5m])), \"transaction\", \"$1\", \"endpoint\", \"(.+)\") or label_replace(sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m]) * 1000), \"transaction\", \"$1\", \"http_route\", \"(.+)\"))",
+              "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_sum{service_name=~\"$service\"}[5m]))",
               "refId": "D",
               "instant": true,
               "format": "table",
               "range": false
             }
           ],
-          "title": "Transactions \u2014 most time consuming",
+          "title": "Routes — most time consuming",
           "transformations": [
             {
               "id": "merge",
@@ -995,18 +989,18 @@ data:
                   "Time": true
                 },
                 "indexByName": {
-                  "transaction": 0,
+                  "http_route": 0,
                   "Value #A": 1,
                   "Value #B": 2,
                   "Value #C": 3,
                   "Value #D": 4
                 },
                 "renameByName": {
-                  "transaction": "Transaction",
+                  "http_route": "Route",
                   "Value #A": "Throughput (rpm)",
-                  "Value #B": "Avg resp (ms)",
+                  "Value #B": "Avg resp",
                   "Value #C": "Apdex",
-                  "Value #D": "Time consumed (ms/s)"
+                  "Value #D": "Time consumed (s/s)"
                 }
               }
             }
@@ -1032,9 +1026,9 @@ data:
               "type": "prometheus",
               "uid": "Prometheus"
             },
-            "definition": "label_values({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}, service_name)",
+            "definition": "label_values(http_server_request_duration_seconds_count, service_name)",
             "query": {
-              "query": "label_values({__name__=~\"http_server_duration_milliseconds_count|http_server_request_duration_seconds_count\"}, service_name)",
+              "query": "label_values(http_server_request_duration_seconds_count, service_name)",
               "refId": "service"
             },
             "includeAll": true,

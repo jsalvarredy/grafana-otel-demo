@@ -253,7 +253,7 @@ alerting:
                   expr: |
                     1000 * histogram_quantile(
                       0.95,
-                      sum(rate(traces_spanmetrics_latency_bucket{span_kind="SPAN_KIND_SERVER"}[5m])) by (le)
+                      sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)
                     )
                   instant: true
                   intervalMs: 1000
@@ -385,8 +385,6 @@ alerting:
                   editorMode: code
                   expr: |
                     count(
-                      sum by (service_name) (rate(http_requests_total[5m]))
-                      or
                       sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
                     )
                   instant: true
