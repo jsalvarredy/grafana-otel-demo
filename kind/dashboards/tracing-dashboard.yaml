@@ -417,7 +417,7 @@ data:
         {
           "id": 101,
           "type": "row",
-          "title": "Service map \u2014 live trace dependencies",
+          "title": "Service map — live trace dependencies",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -435,7 +435,7 @@ data:
             "type": "tempo",
             "uid": "Tempo"
           },
-          "description": "Built by Tempo from the traces flowing right now (user \u2192 services and service \u2192 service).",
+          "description": "Built by Tempo from the traces flowing right now (user → services and service → service).",
           "gridPos": {
             "h": 10,
             "w": 24,
@@ -457,7 +457,7 @@ data:
         {
           "id": 102,
           "type": "row",
-          "title": "RED metrics \u2014 derived from spans",
+          "title": "RED metrics — derived from spans",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -673,7 +673,8 @@ data:
               "legendFormat": "{{service}}",
               "range": true,
               "instant": false,
-              "format": "time_series"
+              "format": "time_series",
+              "exemplar": true
             }
           ]
         },
@@ -716,7 +717,8 @@ data:
               "format": "heatmap",
               "legendFormat": "{{le}}",
               "range": true,
-              "refId": "A"
+              "refId": "A",
+              "exemplar": true
             }
           ],
           "options": {
@@ -841,7 +843,7 @@ data:
         {
           "id": 104,
           "type": "row",
-          "title": "Trace explorer \u2014 click a row to open the full waterfall",
+          "title": "Trace explorer — click a row to open the full waterfall",
           "collapsed": false,
           "gridPos": {
             "h": 1,
