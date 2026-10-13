@@ -40,6 +40,9 @@ resources:
 env:
   # Grafana Alloy (OTLP gateway) endpoint
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  # Emit only the stable HTTP semconv (http.server.request.duration, seconds).
+  # Not http/dup: the legacy http.server.duration (ms) must not be emitted.
+  OTEL_SEMCONV_STABILITY_OPT_IN: "http"
   # Attach trace exemplars to histogram samples (metric -> trace correlation).
   OTEL_METRICS_EXEMPLAR_FILTER: "trace_based"
   # Products Service URL for inter-service communication

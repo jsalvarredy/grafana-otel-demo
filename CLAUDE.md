@@ -55,9 +55,7 @@ FOR_CTOS.md                # Brief para líderes de ingeniería (costos y trade-
 ```
 
 ## Métricas clave en Prometheus
-- **SDK services**: `http_requests_total` (labels: http_status_code, method, endpoint, service_name)
-- **SDK histogram**: `http_server_duration_milliseconds_bucket` (latencia en ms)
-- **Java agent / Beyla**: `http_server_request_duration_seconds_count` / `_bucket` (semconv estable, en segundos)
+- **HTTP (all 3 apps)**: `http_server_request_duration_seconds_count` / `_bucket` / `_sum` (stable semconv, seconds; labels `http_request_method`, `http_response_status_code`, `http_route` (template), `url_scheme`, `service_name`). Products/Orders emit it through the official library instrumentation (`instrumentation-http` + express / `instrumentation-flask`) with `OTEL_SEMCONV_STABILITY_OPT_IN=http`; buckets are pinned by a View in Node. `http_requests_total` and `http_server_duration_milliseconds*` no longer exist.
 - **Span metrics (Tempo generator)**: `traces_spanmetrics_*` (label `service`, dimensión `db.system`), `traces_service_graph_*`
 - **Recording rules**: `job:http_errors:*`, `service:http_errors:*` (SLO burn rates, budget 0.001 = SLO 99.9%), `service:apdex:ratio5m` (Apdex T=250ms)
 - **Business**: revenue_at_risk_dollars, transaction_value_dollars, customer_experience_score, orders_created_total
@@ -77,9 +75,10 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
   semconv estable del Java agent (`http_server_request_duration_seconds*`).
   Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
-- Exemplars: activados vía `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` en las
-  apps y `send_exemplars: true` en el remote write de Alloy; Prometheus corre
-  con `enable-feature=exemplar-storage`.
+- Exemplars: Python emits them on `http.server.request.duration` with
+  `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` (verified in the OTLP data point);
+  Node cannot (see known issues). Alloy's remote write uses
+  `send_exemplars: true`; Prometheus runs with `enable-feature=exemplar-storage`.
 - Tempo: `overrides.defaults.metrics_generator.processors` habilita
   service-graphs, span-metrics y local-blocks. En Tempo 2.8
   `overrides.defaults.search` NO existe (error "field defaults not found").
@@ -100,10 +99,11 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   una vez por el DaemonSet de stdout (sin trace_id) y otra por OTLP del Java
   agent (CON trace_id/span_id). La correlación trace→log de Java funciona por
   la vía OTLP; falta decidir/filtrar una de las dos vías (Bloque C del informe)
-- Exemplars: solo los produce el metrics-generator de Tempo (span metrics,
-  verificado). El SDK de JS no cablea OTEL_METRICS_EXEMPLAR_FILTER (la env es
-  no-op en Node); las familias que pasan por Alloy no muestran exemplars en
-  Prometheus — pendiente investigar la conversión otelcol.exporter.prometheus
+- Node exemplars: `@opentelemetry/sdk-metrics` 2.12.0 ships the exemplar classes
+  but does not export them, MeterProvider/View have no option to select a
+  filter or reservoir, and the aggregators never use them, so
+  `OTEL_METRICS_EXEMPLAR_FILTER` is a no-op. Products' metric -> trace jump relies
+  on Tempo's span metrics.
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)
@@ -113,7 +113,6 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   Pendiente: promover e2e a gate de PR cuando acumule historial estable.
 - GIF del flujo exemplar→trace→log→flame graph y devcontainer/Codespaces en README
 - PostgreSQL real para reemplazar los spans simulados de DB (withPostgres/withRedis/withMongo)
-- Unificar semconv HTTP de los SDK apps con la estable (elimina los `or` en queries)
 - Profiling para Python (Node y Java ya empujan a Pyroscope; Java vía
   agente Pyroscope baked-in, segundo -javaagent en JAVA_TOOL_OPTIONS)
 - Retention en Loki + persistencia para Tempo/Pyroscope

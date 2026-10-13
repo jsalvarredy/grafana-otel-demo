@@ -168,13 +168,13 @@ Use these queries in Grafana -> Explore -> Prometheus:
 
 ```promql
 # Request rate by service
-sum(rate(http_requests_total[5m])) by (exported_job)
+sum(rate(http_server_request_duration_seconds_count[5m])) by (service_name)
 
 # Error rate
-sum(rate(http_requests_total{http_status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
+sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))
 
-# p95 latency
-histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le, endpoint))
+# p95 latency (seconds)
+histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, http_route))
 
 # Cache hit ratio
 cache_hit_ratio{cache_name="product_cache"}
