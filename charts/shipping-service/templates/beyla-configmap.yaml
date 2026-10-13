@@ -1,0 +1,19 @@
+{{- if .Values.beyla.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shipping-service.fullname" . }}-beyla
+  labels:
+    {{- include "shipping-service.labels" . | nindent 4 }}
+data:
+  beyla-config.yml: |
+    routes:
+      patterns:
+        {{- toYaml .Values.beyla.routes.patterns | nindent 8 }}
+      unmatched: {{ .Values.beyla.routes.unmatched }}
+      ignored_patterns:
+        {{- toYaml .Values.beyla.routes.ignoredPatterns | nindent 8 }}
+    otel_metrics_export:
+      buckets:
+        duration_histogram: {{ toJson .Values.beyla.buckets.duration }}
+{{- end }}

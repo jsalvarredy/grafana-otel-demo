@@ -1806,7 +1806,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "count(count by (service_name) (http_server_request_duration_seconds_count{otel_scope_name!~\".*beyla.*\"})) or vector(0)",
+              "expr": "count(count by (service_name) (http_server_request_duration_seconds_count{otel_scope_name!=\"go.opentelemetry.io/obi\"})) or vector(0)",
               "legendFormat": "SDK Services",
               "refId": "A"
             }
@@ -1870,7 +1870,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "count(count by (service_name) (http_server_request_duration_seconds_count{otel_scope_name=~\".*beyla.*\"})) or vector(0)",
+              "expr": "count(count by (service_name) (http_server_request_duration_seconds_count{otel_scope_name=\"go.opentelemetry.io/obi\"})) or vector(0)",
               "legendFormat": "eBPF Services",
               "refId": "A"
             }
@@ -1993,7 +1993,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{otel_scope_name!~\".*beyla.*\"}[5m]))",
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{otel_scope_name!=\"go.opentelemetry.io/obi\"}[5m]))",
               "legendFormat": "SDK - {{service_name}}",
               "refId": "A"
             },
@@ -2002,7 +2002,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{otel_scope_name=~\".*beyla.*\"}[5m]))",
+              "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count{otel_scope_name=\"go.opentelemetry.io/obi\"}[5m]))",
               "legendFormat": "Beyla - {{service_name}}",
               "refId": "B"
             }

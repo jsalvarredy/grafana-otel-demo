@@ -80,6 +80,20 @@ jobs:
           done
           exit $fail
 
+  # Semantic-conventions contract C1: one stable HTTP family. The legacy
+  # instruments must not reappear in rules, alerts or dashboards.
+  legacy-http-metrics:
+    name: No legacy HTTP metric names under kind/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if http_requests_total or http_server_duration_milliseconds reappear
+        run: |
+          if grep -rnE 'http_requests_total|http_server_duration_milliseconds' kind/; then
+            echo "::error::legacy HTTP metric names found under kind/ (use http_server_request_duration_seconds_*)"
+            exit 1
+          fi
+
   build:
     name: Docker build ${{ matrix.service }}
     runs-on: ubuntu-latest
