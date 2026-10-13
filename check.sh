@@ -158,11 +158,14 @@ if [ "$DEPLOYMENT_ANNOTATION_REQUIRED" = "0" ]; then
 else
   annotations=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/annotations" \
     --data-urlencode 'tags=deployment' --data-urlencode 'limit=100' 2>/dev/null || true)
-  if [ -n "$release_deployment_id" ] && \
-     echo "$annotations" | grep -Fq "id=${release_deployment_id}" && \
-     echo "$annotations" | grep -Fq "version=${release_version}" && \
-     echo "$annotations" | grep -Fq 'status:succeeded'; then
+  # One JSON object per line (API returns newest first), then match id and
+  # version within the SAME annotation instead of anywhere in the payload.
+  matching=$(printf '%s' "$annotations" | sed 's/},{"id"/}\n{"id"/g' \
+    | grep -F "id=${release_deployment_id}" | grep -F "version=${release_version}" || true)
+  if [ -n "$release_deployment_id" ] && printf '%s\n' "$matching" | grep -Fq 'status:succeeded'; then
     ok "Grafana annotation matches current release ${release_deployment_id} (${release_version}, succeeded)"
+  elif [ -n "$release_deployment_id" ] && printf '%s\n' "$matching" | head -1 | grep -Fq 'status:failed'; then
+    bad "Latest annotation for ${release_deployment_id} is failed — fix the readiness failures above and re-run ./setup.sh's verification (./check.sh alone never records a succeeded annotation)"
   else
     bad "No succeeded Grafana annotation matches the deployment ID/version currently running"
   fi
@@ -220,22 +223,33 @@ section "Correlation: exemplars (metric → trace)"
 # the app family (http_server_request_duration_seconds) must carry them too.
 # Orders (Python) and Shipping (Java agent) are required; Products (Node SDK)
 # does not wire exemplars yet, so it is not checked.
-exemplar_for(){
-  curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
-    --data-urlencode "query=$1" \
-    --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null \
-    | grep -oE '"traceID":"[a-f0-9]+"' | head -1
+# Tempo's metrics-generator labels exemplars "traceID"; app exemplars that go
+# through Alloy's otelcol.exporter.prometheus use "trace_id" (and span_id).
+# Accept both. Reads query_exemplars JSON on stdin and prints the first trace
+# label name found (traceID | trace_id), or nothing.
+exemplar_label(){
+  grep -oE '"(traceID|trace_id)"[[:space:]]*:[[:space:]]*"[a-fA-F0-9]+"' | head -1 | sed -E 's/^"([A-Za-z_]+)".*/\1/'
 }
-ex=$(exemplar_for traces_spanmetrics_latency_bucket)
-if [ -n "$ex" ]; then ok "Exemplars present on span metrics"; else warn "No span-metrics exemplars in last 15m (need traffic with sampled traces)"; fi
+# Probe a query; sets EX_LABEL (label found or empty) and EX_SERIES (number of
+# exemplar series returned, so "none" and "present but unparsed" differ).
+exemplar_probe(){
+  local body
+  body=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
+    --data-urlencode "query=$1" \
+    --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null)
+  EX_LABEL=$(printf '%s' "$body" | exemplar_label)
+  EX_SERIES=$(printf '%s' "$body" | grep -o '"seriesLabels"' | wc -l | tr -d ' ')
+}
+exemplar_probe traces_spanmetrics_latency_bucket
+if [ -n "$EX_LABEL" ]; then ok "Exemplars present on span metrics (label: $EX_LABEL)"; else warn "No span-metrics exemplars in last 15m (series returned: $EX_SERIES; need traffic with sampled traces)"; fi
 for svc in orders-service shipping-service; do
-  ex=$(exemplar_for "http_server_request_duration_seconds_bucket{service_name=\"$svc\"}")
-  if [ -n "$ex" ]; then
-    ok "Exemplars present on http_server_request_duration_seconds_bucket: $svc"
+  exemplar_probe "http_server_request_duration_seconds_bucket{service_name=\"$svc\"}"
+  if [ -n "$EX_LABEL" ]; then
+    ok "Exemplars present on http_server_request_duration_seconds_bucket: $svc (label: $EX_LABEL, series: $EX_SERIES)"
   elif [ "$svc" = "shipping-service" ] && kubectl get deploy shipping-service -n demo -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null | grep -qw beyla; then
     warn "No app-family exemplars for shipping-service (Beyla does not emit exemplars)"
   else
-    bad "No exemplars on http_server_request_duration_seconds_bucket for $svc in last 15m"
+    bad "No exemplars on http_server_request_duration_seconds_bucket for $svc in last 15m (exemplar series returned: $EX_SERIES; >0 means unparsed trace label, 0 means none emitted)"
   fi
 done
 
