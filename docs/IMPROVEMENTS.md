@@ -7,6 +7,11 @@
 > `generate-traffic.sh` script referenced below was renamed — today it is
 > **`traffic.sh`** at the repo root. For current troubleshooting steps use
 > [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+>
+> The custom `http_requests_total` / `http_server_duration` (ms) instruments and
+> their `endpoint` / `http_status_code` labels described below were later removed:
+> all three apps now emit the stable `http_server_request_duration_seconds_*`
+> family (labels `http_route`, `http_response_status_code`). See `CLAUDE.md`.
 
 ## Overview
 

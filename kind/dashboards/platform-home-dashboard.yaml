@@ -136,7 +136,7 @@ data:
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "description": "Total request throughput across every service (SDK + Beyla).",
+          "description": "Total request throughput across every service.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -184,7 +184,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "(sum(rate(http_requests_total[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0))",
+              "expr": "sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0)",
               "legendFormat": "Throughput",
               "refId": "A"
             }
@@ -253,7 +253,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "((sum(rate(http_requests_total{http_status_code=~\"5..\"}[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) or vector(0))) / clamp_min((sum(rate(http_requests_total[5m])) or vector(0)) + (sum(rate(http_server_request_duration_seconds_count[5m])) or vector(0)), 1) * 100",
+              "expr": "((sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) or vector(0)) / sum(rate(http_server_request_duration_seconds_count[5m]))) * 100",
               "legendFormat": "Error rate",
               "refId": "A"
             }
@@ -266,7 +266,7 @@ data:
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "description": "95th percentile request latency (SDK histogram).",
+          "description": "95th percentile request latency.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -283,15 +283,15 @@ data:
                   },
                   {
                     "color": "#EAB839",
-                    "value": 200
+                    "value": 0.2
                   },
                   {
                     "color": "red",
-                    "value": 500
+                    "value": 0.5
                   }
                 ]
               },
-              "unit": "ms"
+              "unit": "s"
             },
             "overrides": []
           },
@@ -322,7 +322,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "histogram_quantile(0.95, sum(rate(http_server_duration_milliseconds_bucket[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
               "legendFormat": "P95",
               "refId": "A"
             }
@@ -383,7 +383,7 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "(count(count by (service_name) (rate(http_requests_total[5m])) or count by (service_name) (rate(http_server_request_duration_seconds_count[5m]))) or vector(0))",
+              "expr": "count(count by (service_name) (rate(http_server_request_duration_seconds_count[5m]))) or vector(0)",
               "legendFormat": "Active services",
               "refId": "A"
             }
@@ -447,18 +447,9 @@ data:
                 "type": "prometheus",
                 "uid": "Prometheus"
               },
-              "expr": "sum by (service_name) (rate(http_requests_total[5m]))",
-              "legendFormat": "{{service_name}}",
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "Prometheus"
-              },
               "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))",
               "legendFormat": "{{service_name}}",
-              "refId": "B"
+              "refId": "A"
             }
           ],
           "title": "Traffic by Service",

@@ -57,7 +57,7 @@ FOR_CTOS.md                # Brief para líderes de ingeniería (costos y trade-
 ## Métricas clave en Prometheus
 - **HTTP (all 3 apps)**: `http_server_request_duration_seconds_count` / `_bucket` / `_sum` (stable semconv, seconds; labels `http_request_method`, `http_response_status_code`, `http_route` (template), `url_scheme`, `service_name`). Products/Orders emit it through the official library instrumentation (`instrumentation-http` + express / `instrumentation-flask`) with `OTEL_SEMCONV_STABILITY_OPT_IN=http`; buckets are pinned by a View in Node. `http_requests_total` and `http_server_duration_milliseconds*` no longer exist.
 - **Span metrics (Tempo generator)**: `traces_spanmetrics_*` (label `service`, dimensión `db.system`), `traces_service_graph_*`
-- **Recording rules**: `job:http_errors:*`, `service:http_errors:*` (SLO burn rates, budget 0.001 = SLO 99.9%), `service:apdex:ratio5m` (Apdex T=250ms)
+- **Recording rules**: `job:http_errors:*`, `service:http_errors:*` (SLO burn rates, budget 0.001 = SLO 99.9%), `service:apdex:ratio5m` (Apdex T=250ms, built from `le="0.25"` / `le=~"1(\.0+)?"` of the single HTTP family)
 - **Business**: revenue_at_risk_dollars, transaction_value_dollars, customer_experience_score, orders_created_total
 - **Synthetic**: probe_success, probe_duration_seconds (blackbox)
 - **k6**: k6_* vía remote write
@@ -71,10 +71,18 @@ Alertas provisionadas en Grafana (no Alertmanager): error rate, P95, SLO
 fast/slow burn (multi-window), service down, synthetic probe down.
 
 ## Decisiones técnicas que hay que conocer
-- Las queries de dashboards/reglas unen DOS familias de métricas HTTP con `or`:
-  la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
-  semconv estable del Java agent (`http_server_request_duration_seconds*`).
-  Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
+- Dashboards, recording rules and alerts query a SINGLE HTTP family
+  (`http_server_request_duration_seconds_*`, seconds) with no `or` between
+  families. Latency thresholds and panel units are in seconds (`s`).
+  Apdex uses `le="0.25"` (T) and `le=~"1(\.0+)?"` (4T); the regex only covers
+  integer formatting of one label, it is not a cross-family join. Per-endpoint
+  panels use `http_route`; latency percentile panels enable exemplars on the
+  app family (metric -> exemplar -> trace -> logs); Node/Products has none
+  (see Known issues), so its trace jump goes through Tempo span metrics.
+- Recording rule names (`job:http_errors:*`, `service:http_errors:*`,
+  `service:apdex_*`, `service:apdex:ratio5m`, `job:apdex:ratio5m`) and the
+  `service_name` label are a stable contract: dashboards and Grafana alerts
+  consume them. The P95 latency alert queries the app family (ms = 1000 x s).
 - Exemplars: `send_exemplars: true` in Alloy's remote write and Prometheus
   `enable-feature=exemplar-storage`. The Alloy -> Prometheus path is verified
   (local repro with Alloy 1.10.0 + Prometheus 3.5 + Java agent):
