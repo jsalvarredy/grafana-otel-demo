@@ -160,6 +160,25 @@ kind delete cluster --name grafana-otel-demo
 ./setup.sh
 ```
 
+### No exemplars in Prometheus for an app
+
+Alloy (`otelcol.exporter.prometheus` -> `prometheus.remote_write`) forwards
+exemplars on the `_bucket` series; Prometheus needs `--enable-feature=exemplar-storage`.
+
+```bash
+curl -s "http://localhost:9090/api/v1/query_exemplars?query=http_server_request_duration_seconds_bucket{service_name=\"shipping-service\"}&start=$(($(date +%s)-600))&end=$(date +%s)"
+```
+
+If empty, the app SDK is not emitting exemplars (Node/Python need an exemplar
+filter wired in the SDK); exemplars also require a sampled span. Exemplars only
+exist on histogram `_bucket` series, not `_count`/`_sum`.
+
+### Duplicated log lines in Loki
+
+Pods exporting logs over OTLP must carry `observability.mikroways.net/logs: otlp`
+so `alloy-logs` skips their stdout. Check with
+`kubectl -n demo get pod -l app.kubernetes.io/name=shipping-service -o jsonpath='{.items[0].metadata.annotations}'`.
+
 ### Docker Resource Limits
 
 Ensure Docker has enough resources (recommended: 4GB+ RAM, 2+ CPUs).

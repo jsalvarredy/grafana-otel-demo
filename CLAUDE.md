@@ -75,10 +75,22 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
   semconv estable del Java agent (`http_server_request_duration_seconds*`).
   Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
-- Exemplars: Python emits them on `http.server.request.duration` with
+- Exemplars: `send_exemplars: true` in Alloy's remote write and Prometheus
+  `enable-feature=exemplar-storage`. The Alloy -> Prometheus path is verified
+  (local repro with Alloy 1.10.0 + Prometheus 3.5 + Java agent):
+  `otelcol.exporter.prometheus` -> `prometheus.remote_write` DOES keep exemplars
+  (on the `_bucket` series, with `trace_id`/`span_id`), so there is no need to
+  change exporter. Python emits exemplars on `http.server.request.duration` with
   `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` (verified in the OTLP data point);
-  Node cannot (see known issues). Alloy's remote write uses
-  `send_exemplars: true`; Prometheus runs with `enable-feature=exemplar-storage`.
+  Node cannot: `@opentelemetry/sdk-metrics` 2.12.0 does not support them (see
+  known issues). With tail sampling at 100% (demo) every exemplar points to a
+  kept trace; if the percentage is lowered, an exemplar may point to a dropped
+  trace (errors and slow >=500ms traces are always kept).
+- Duplicated logs: pods that export logs over OTLP (with trace_id/span_id)
+  carry the pod annotation `observability.mikroways.net/logs: otlp` and
+  `alloy-logs` drops them from the stdout tail (shipping with the Java agent,
+  products and orders). Shipping with Beyla (no OTLP logs) has no annotation
+  and keeps flowing through stdout.
 - Tempo: `overrides.defaults.metrics_generator.processors` habilita
   service-graphs, span-metrics y local-blocks. En Tempo 2.8
   `overrides.defaults.search` NO existe (error "field defaults not found").
@@ -95,15 +107,12 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 ## Problemas conocidos
 - Beyla sidecar requiere `privileged: true` y kernel con BTF (CONFIG_DEBUG_INFO_BTF=y)
 - Loki gateway da 502 transitorio durante startup (se resuelve solo con retry)
-- Los logs del shipping-service llegan a Loki DUPLICADOS (verificado 2026-07):
-  una vez por el DaemonSet de stdout (sin trace_id) y otra por OTLP del Java
-  agent (CON trace_id/span_id). La correlación trace→log de Java funciona por
-  la vía OTLP; falta decidir/filtrar una de las dos vías (Bloque C del informe)
 - Node exemplars: `@opentelemetry/sdk-metrics` 2.12.0 ships the exemplar classes
   but does not export them, MeterProvider/View have no option to select a
   filter or reservoir, and the aggregators never use them, so
-  `OTEL_METRICS_EXEMPLAR_FILTER` is a no-op. Products' metric -> trace jump relies
-  on Tempo's span metrics.
+  `OTEL_METRICS_EXEMPLAR_FILTER` is a no-op and Products' HTTP histogram has no
+  exemplars. The metric -> trace jump for Products relies on Tempo's span
+  metrics. Python emits exemplars; the Alloy -> Prometheus path keeps them.
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)
