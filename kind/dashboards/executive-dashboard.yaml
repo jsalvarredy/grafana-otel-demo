@@ -637,7 +637,7 @@ data:
             "type": "prometheus",
             "uid": "Prometheus"
           },
-          "description": "95th percentile latency SLO (Target: <500ms)",
+          "description": "95th percentile latency SLO (Target: <1s, Apdex 4T)",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -670,7 +670,7 @@ data:
                   "type": "range"
                 }
               ],
-              "max": 1,
+              "max": 2,
               "min": 0,
               "thresholds": {
                 "mode": "absolute",
@@ -681,7 +681,7 @@ data:
                   },
                   {
                     "color": "red",
-                    "value": 0.5
+                    "value": 1
                   }
                 ]
               },
@@ -722,7 +722,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "Latency SLO P95 (Target: <500ms)",
+          "title": "Latency SLO P95 (Target: <1s)",
           "type": "gauge"
         },
         {
@@ -1257,7 +1257,7 @@ data:
                   },
                   {
                     "color": "red",
-                    "value": 0.5
+                    "value": 1
                   }
                 ]
               },

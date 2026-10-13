@@ -241,11 +241,11 @@ alerting:
                     - evaluator: { type: gt, params: [5] }
 
           - uid: alert-high-latency-p95
-            title: High P95 latency (>500ms)
+            title: High P95 latency (>1s)
             condition: C
             for: 3m
             annotations:
-              summary: "P95 request latency is above 500ms"
+              summary: "P95 request latency is above 1s (Apdex 4T, frustrated)"
             labels:
               severity: warning
             data:
@@ -275,7 +275,7 @@ alerting:
                   expression: B
                   refId: C
                   conditions:
-                    - evaluator: { type: gt, params: [500] }
+                    - evaluator: { type: gt, params: [1000] }
 
           # Multi-window multi-burn-rate SLO alerts (Google SRE workbook).
           # Firing requires BOTH a long and a short window to be burning: the

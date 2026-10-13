@@ -263,11 +263,11 @@ data:
                   },
                   {
                     "color": "#EAB839",
-                    "value": 0.2
+                    "value": 0.5
                   },
                   {
                     "color": "red",
-                    "value": 0.5
+                    "value": 1
                   }
                 ]
               },
@@ -590,7 +590,7 @@ data:
                   },
                   {
                     "color": "red",
-                    "value": 0.5
+                    "value": 1
                   }
                 ]
               },

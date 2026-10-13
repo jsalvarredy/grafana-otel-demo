@@ -90,6 +90,12 @@ route exclusions to rules or alerts.
   `service:apdex_*`, `service:apdex:ratio5m`, `job:apdex:ratio5m`) and the
   `service_name` label are a stable contract: dashboards and Grafana alerts
   consume them. The P95 latency alert queries the app family (ms = 1000 x s).
+- The "High P95 latency" alert fires above 1 s (Apdex 4T, an exact C1 bucket
+  edge, so no interpolation), not 500 ms: the normal checkout flow
+  (`POST /api/orders` = three products calls + processing) already takes
+  ~600 ms. Latency panel thresholds follow the same line (red at 1 s).
+  `setup.sh` seeds only one 5xx and one `/api/slow` per run so a fresh
+  cluster does not trip the slow-burn alert (0.6% error ratio).
 - Exemplars: `send_exemplars: true` in Alloy's remote write and Prometheus
   `enable-feature=exemplar-storage`. The Alloy -> Prometheus path is verified
   (local repro with Alloy 1.10.0 + Prometheus 3.5 + Java agent):
