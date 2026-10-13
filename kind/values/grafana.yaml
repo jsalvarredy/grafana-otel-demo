@@ -82,10 +82,14 @@ datasources:
         access: proxy
         isDefault: true
         jsonData:
-          # This enables the jump from Metrics to Traces (Exemplars)
+          # This enables the jump from Metrics to Traces (Exemplars). Two label
+          # names are needed: app metrics arriving via Alloy carry `trace_id`,
+          # while Tempo's span-metrics generator writes `traceID`.
           exemplarTraceIdDestinations:
             - name: trace_id
               datasourceUid: Tempo # Must match the Tempo UID below
+            - name: traceID
+              datasourceUid: Tempo
 
       - name: Loki
         type: loki
