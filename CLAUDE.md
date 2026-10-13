@@ -70,9 +70,9 @@ Budget, Synthetic Monitoring, Frontend/RUM, k6 Load Testing, K8s Cluster.
 Alertas provisionadas en Grafana (no Alertmanager): error rate, P95, SLO
 fast/slow burn (multi-window), service down, synthetic probe down.
 Alerts are expected to be SILENT at rest after `./setup.sh`: its seeded traffic
-(~1700 requests) contains exactly one `/error` per service and one `/api/slow`
-(5xx ratio ~0.2%, below half of the 6x slow-burn threshold; slow < 0.1%), which
-still leaves one error trace per service and one slow trace in Tempo. `check.sh`
+(~560 requests) contains exactly one 5xx (products `/error`) and one `/api/slow`
+(5xx ratio ~0.18%, more than 3x under the 0.6% slow-burn line; slow ~0.18%),
+which still leaves one error trace and one slow trace in Tempo. `check.sh`
 warm-up sends only healthy requests. To fire alerts on purpose, run
 `./incident.sh`; do not add error/slow calls to setup or check, and do not add
 route exclusions to rules or alerts.

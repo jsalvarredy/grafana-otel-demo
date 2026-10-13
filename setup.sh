@@ -437,11 +437,11 @@ make_request() {
 # Simulate realistic e-commerce traffic across ALL services.
 # The seeded anomalies are deliberately sub-threshold so alerts stay silent at
 # rest: exactly ONE deliberate 5xx (products /error) and ONE /api/slow over the
-# whole run, diluted by ~1675 healthy requests (5xx ratio ~0.06%, well under
-# the 0.6% slow-burn line; slow < 0.1%). They still leave one error trace and
+# whole run, diluted by ~560 requests (5xx ratio ~0.18%, over 3x under
+# the 0.6% slow-burn line; slow ~0.18%). They still leave one error trace and
 # one slow trace in Tempo.
 # Use ./incident.sh to fire the alerts on purpose.
-SEED_ITERATIONS=150
+SEED_ITERATIONS=50
 for i in $(seq 1 "$SEED_ITERATIONS"); do
     # Users browsing products
     make_request "products.127.0.0.1.nip.io" "/api/products"
