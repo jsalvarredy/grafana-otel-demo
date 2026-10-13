@@ -152,6 +152,20 @@ Beyla automatically generates RED metrics:
 - `url_path` - Request path
 - `service_name` - Service name
 
+### Differences vs the HTTP contract (C1)
+
+Not run for this change; based on Beyla's documented behaviour, to be checked
+when Beyla is enabled:
+
+- Metric name, unit (seconds), `http_request_method` and
+  `http_response_status_code` match the Java agent / Node / Python family.
+- Beyla labels requests with `url_path` (raw path, high cardinality) and only
+  sets `http_route` when route patterns are configured (`BEYLA_ROUTES_*`); the
+  contract requires a templated `http_route` and no raw paths.
+- No `url_scheme` label by default, and no trace-based exemplars from Beyla.
+- Bucket boundaries are Beyla's own defaults, not the C1 advisory list; confirm
+  they include 0.25 and 1 so Apdex works.
+
 ## Traces captured by Beyla
 
 For each inbound HTTP request, Beyla generates a span with:

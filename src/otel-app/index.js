@@ -18,16 +18,8 @@ const logger = logs.getLogger('products-service', '1.0.0');
 // RED METRICS (Rate, Error, Duration) - Infrastructure Observability
 // ===================================================================
 
-// HTTP Request Counter - tracks all incoming requests
-const requestCounter = meter.createCounter('http_requests_total', {
-  description: 'Total number of HTTP requests by endpoint, method, and status code',
-});
-
-// HTTP Server Duration - tracks request latency for SLA/SLO monitoring
-const httpServerDuration = meter.createHistogram('http_server_duration', {
-  description: 'HTTP server request duration in milliseconds',
-  unit: 'ms',
-});
+// HTTP server RED metrics (http.server.request.duration, seconds) are emitted
+// by @opentelemetry/instrumentation-http with stable semconv - see tracing.js.
 
 // Product-specific metrics
 const productViewCounter = meter.createCounter('products_viewed_total', {
@@ -722,22 +714,6 @@ app.use((req, res, next) => {
 
   const captureMetrics = (body) => {
     const duration = Date.now() - startTime;
-    const endpoint = req.route?.path || req.path || 'unknown';
-    const method = req.method;
-    const statusCode = res.statusCode;
-
-    requestCounter.add(1, {
-      endpoint,
-      method,
-      http_status_code: statusCode.toString(),
-    });
-
-    httpServerDuration.record(duration, {
-      endpoint,
-      method,
-      http_status_code: statusCode.toString(),
-    });
-
     recentResponseTimes.push(duration);
     if (recentResponseTimes.length > MAX_SAMPLES) recentResponseTimes.shift();
 

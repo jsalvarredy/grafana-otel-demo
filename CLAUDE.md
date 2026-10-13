@@ -55,9 +55,7 @@ FOR_CTOS.md                # Brief para líderes de ingeniería (costos y trade-
 ```
 
 ## Métricas clave en Prometheus
-- **SDK services**: `http_requests_total` (labels: http_status_code, method, endpoint, service_name)
-- **SDK histogram**: `http_server_duration_milliseconds_bucket` (latencia en ms)
-- **Java agent / Beyla**: `http_server_request_duration_seconds_count` / `_bucket` (semconv estable, en segundos)
+- **HTTP (all 3 apps)**: `http_server_request_duration_seconds_count` / `_bucket` / `_sum` (stable semconv, seconds; labels `http_request_method`, `http_response_status_code`, `http_route` (template), `url_scheme`, `service_name`). Products/Orders emit it through the official library instrumentation (`instrumentation-http` + express / `instrumentation-flask`) with `OTEL_SEMCONV_STABILITY_OPT_IN=http`; buckets are pinned by a View in Node. `http_requests_total` and `http_server_duration_milliseconds*` no longer exist.
 - **Span metrics (Tempo generator)**: `traces_spanmetrics_*` (label `service`, dimensión `db.system`), `traces_service_graph_*`
 - **Recording rules**: `job:http_errors:*`, `service:http_errors:*` (SLO burn rates, budget 0.001 = SLO 99.9%), `service:apdex:ratio5m` (Apdex T=250ms)
 - **Business**: revenue_at_risk_dollars, transaction_value_dollars, customer_experience_score, orders_created_total
@@ -77,16 +75,17 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   la legacy de los SDK apps (`http_server_duration_milliseconds*`, ms) y la
   semconv estable del Java agent (`http_server_request_duration_seconds*`).
   Los matchers `le=~"250(\.0+)?"` aceptan ambos formatos de bucket.
-- Exemplars: enabled via `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` in the
-  apps and `send_exemplars: true` in Alloy's remote write; Prometheus runs
-  with `enable-feature=exemplar-storage`. Verified (local repro with Alloy
-  1.10.0 + Prometheus 3.5 + Java agent): `otelcol.exporter.prometheus` ->
-  `prometheus.remote_write` DOES keep exemplars (on the `_bucket` series, with
-  `trace_id`/`span_id`), so there is no need to change exporter. If an app
-  shows no exemplars, its SDK is not emitting them (Node/Python); Alloy and
-  Prometheus are not dropping them. With tail sampling at 100% (demo) every
-  exemplar points to a kept trace; if the percentage is lowered, an exemplar
-  may point to a dropped trace (errors and slow >=500ms traces are always kept).
+- Exemplars: `send_exemplars: true` in Alloy's remote write and Prometheus
+  `enable-feature=exemplar-storage`. The Alloy -> Prometheus path is verified
+  (local repro with Alloy 1.10.0 + Prometheus 3.5 + Java agent):
+  `otelcol.exporter.prometheus` -> `prometheus.remote_write` DOES keep exemplars
+  (on the `_bucket` series, with `trace_id`/`span_id`), so there is no need to
+  change exporter. Python emits exemplars on `http.server.request.duration` with
+  `OTEL_METRICS_EXEMPLAR_FILTER=trace_based` (verified in the OTLP data point);
+  Node cannot: `@opentelemetry/sdk-metrics` 2.12.0 does not support them (see
+  known issues). With tail sampling at 100% (demo) every exemplar points to a
+  kept trace; if the percentage is lowered, an exemplar may point to a dropped
+  trace (errors and slow >=500ms traces are always kept).
 - Duplicated logs: pods that export logs over OTLP (with trace_id/span_id)
   carry the pod annotation `observability.mikroways.net/logs: otlp` and
   `alloy-logs` drops them from the stdout tail (shipping with the Java agent,
@@ -108,10 +107,12 @@ fast/slow burn (multi-window), service down, synthetic probe down.
 ## Problemas conocidos
 - Beyla sidecar requiere `privileged: true` y kernel con BTF (CONFIG_DEBUG_INFO_BTF=y)
 - Loki gateway da 502 transitorio durante startup (se resuelve solo con retry)
-- Node/Python app metrics carry no exemplars: the JS SDK does not wire
-  `OTEL_METRICS_EXEMPLAR_FILTER` (the env var is a no-op in Node). The Alloy ->
-  Prometheus path already carries exemplars (verified with the Java agent); this
-  is fixed in the app instrumentation.
+- Node exemplars: `@opentelemetry/sdk-metrics` 2.12.0 ships the exemplar classes
+  but does not export them, MeterProvider/View have no option to select a
+  filter or reservoir, and the aggregators never use them, so
+  `OTEL_METRICS_EXEMPLAR_FILTER` is a no-op and Products' HTTP histogram has no
+  exemplars. The metric -> trace jump for Products relies on Tempo's span
+  metrics. Python emits exemplars; the Alloy -> Prometheus path keeps them.
 - Python usa `opentelemetry._logs` (la API de logs de OTel Python sigue siendo experimental)
 
 ## Mejoras pendientes priorizadas (auditoría 2026-07)
@@ -121,7 +122,6 @@ fast/slow burn (multi-window), service down, synthetic probe down.
   Pendiente: promover e2e a gate de PR cuando acumule historial estable.
 - GIF del flujo exemplar→trace→log→flame graph y devcontainer/Codespaces en README
 - PostgreSQL real para reemplazar los spans simulados de DB (withPostgres/withRedis/withMongo)
-- Unificar semconv HTTP de los SDK apps con la estable (elimina los `or` en queries)
 - Profiling para Python (Node y Java ya empujan a Pyroscope; Java vía
   agente Pyroscope baked-in, segundo -javaagent en JAVA_TOOL_OPTIONS)
 - Retention en Loki + persistencia para Tempo/Pyroscope
