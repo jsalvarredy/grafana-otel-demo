@@ -40,6 +40,11 @@ resources:
 env:
   # Grafana Alloy (OTLP gateway) endpoint
   OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.monitoring.svc.cluster.local:4318"
+  # Emit only the stable HTTP semconv (http.server.request.duration, seconds).
+  # Not http/dup: the legacy http.server.duration (ms) must not be emitted.
+  OTEL_SEMCONV_STABILITY_OPT_IN: "http"
+  # Ignored by the Node SDK today (no exemplar support in sdk-metrics 2.x), kept
+  # so exemplars start working once upstream wires it.
   # Attach trace exemplars to histogram samples so Grafana can jump
   # from a latency spike straight to the matching trace in Tempo.
   OTEL_METRICS_EXEMPLAR_FILTER: "trace_based"

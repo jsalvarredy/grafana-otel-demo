@@ -82,10 +82,14 @@ datasources:
         access: proxy
         isDefault: true
         jsonData:
-          # This enables the jump from Metrics to Traces (Exemplars)
+          # This enables the jump from Metrics to Traces (Exemplars). Two label
+          # names are needed: app metrics arriving via Alloy carry `trace_id`,
+          # while Tempo's span-metrics generator writes `traceID`.
           exemplarTraceIdDestinations:
             - name: trace_id
               datasourceUid: Tempo # Must match the Tempo UID below
+            - name: traceID
+              datasourceUid: Tempo
 
       - name: Loki
         type: loki
@@ -237,11 +241,11 @@ alerting:
                     - evaluator: { type: gt, params: [5] }
 
           - uid: alert-high-latency-p95
-            title: High P95 latency (>500ms)
+            title: High P95 latency (>1s)
             condition: C
             for: 3m
             annotations:
-              summary: "P95 request latency is above 500ms"
+              summary: "P95 request latency is above 1s (Apdex 4T, frustrated)"
             labels:
               severity: warning
             data:
@@ -253,7 +257,7 @@ alerting:
                   expr: |
                     1000 * histogram_quantile(
                       0.95,
-                      sum(rate(traces_spanmetrics_latency_bucket{span_kind="SPAN_KIND_SERVER"}[5m])) by (le)
+                      sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le)
                     )
                   instant: true
                   intervalMs: 1000
@@ -271,7 +275,7 @@ alerting:
                   expression: B
                   refId: C
                   conditions:
-                    - evaluator: { type: gt, params: [500] }
+                    - evaluator: { type: gt, params: [1000] }
 
           # Multi-window multi-burn-rate SLO alerts (Google SRE workbook).
           # Firing requires BOTH a long and a short window to be burning: the
@@ -385,8 +389,6 @@ alerting:
                   editorMode: code
                   expr: |
                     count(
-                      sum by (service_name) (rate(http_requests_total[5m]))
-                      or
                       sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))
                     )
                   instant: true

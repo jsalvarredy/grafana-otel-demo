@@ -160,6 +160,48 @@ kind delete cluster --name grafana-otel-demo
 ./setup.sh
 ```
 
+### No exemplars in Prometheus for an app
+
+Alloy (`otelcol.exporter.prometheus` -> `prometheus.remote_write`) forwards
+exemplars on the `_bucket` series; Prometheus needs `--enable-feature=exemplar-storage`.
+
+```bash
+curl -s "http://localhost:9090/api/v1/query_exemplars?query=http_server_request_duration_seconds_bucket{service_name=\"shipping-service\"}&start=$(($(date +%s)-600))&end=$(date +%s)"
+```
+
+If empty, the app SDK is not emitting exemplars (Node/Python need an exemplar
+filter wired in the SDK); exemplars also require a sampled span. Exemplars only
+exist on histogram `_bucket` series, not `_count`/`_sum`.
+
+The trace label name depends on the producer: Tempo's span metrics use
+`traceID`, while app exemplars that pass through Alloy use `trace_id` (plus
+`span_id`). `check.sh` accepts both and prints which one it found. When it
+fails it also prints the number of exemplar series returned: `0` means no
+exemplars were emitted (SDK filter, unsampled spans, Beyla), while `>0` means
+exemplars exist but carry an unrecognized trace label.
+
+### check.sh: "No succeeded Grafana annotation..." / "Latest annotation ... is failed"
+
+`setup.sh` runs `check.sh` with the annotation check deferred, and only records
+a `succeeded` deployment annotation after every readiness check passes. If a
+check fails, setup records a `failed` annotation for that deployment ID. A later
+plain `./check.sh` looks for a `succeeded` annotation for the running
+deployment ID and version, so it keeps failing even after you fix the cause:
+`check.sh` only reads annotations, it never writes them.
+
+To clear it, fix the readiness failures listed above it, then re-run
+`./setup.sh`. Each run gets a new deployment ID, so it redeploys, re-verifies
+and records a fresh `succeeded` annotation. Do not hand-write a succeeded
+annotation to silence the check; it is meant to certify a verified release.
+`DEPLOYMENT_ANNOTATION_REQUIRED=0 ./check.sh` verifies the signals alone
+without the annotation gate.
+
+### Duplicated log lines in Loki
+
+Pods exporting logs over OTLP must carry `observability.mikroways.net/logs: otlp`
+so `alloy-logs` skips their stdout. Check with
+`kubectl -n demo get pod -l app.kubernetes.io/name=shipping-service -o jsonpath='{.items[0].metadata.annotations}'`.
+
 ### Docker Resource Limits
 
 Ensure Docker has enough resources (recommended: 4GB+ RAM, 2+ CPUs).

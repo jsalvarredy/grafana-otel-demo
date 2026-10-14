@@ -22,6 +22,11 @@ spec:
         observability.grafana.com/revision: {{ .Values.observability.revision | quote }}
         observability.grafana.com/deployment-id: {{ .Values.observability.deploymentId | quote }}
         observability.grafana.com/deployed-at: {{ .Values.observability.deployedAt | quote }}
+        {{- if .Values.instrumentation.javaAgent.enabled }}
+        # Logs of this pod reach Loki via OTLP (with trace_id/span_id); alloy-logs
+        # drops its stdout copy to avoid duplicated lines.
+        observability.mikroways.net/logs: otlp
+        {{- end }}
         {{- if .Values.beyla.enabled }}
         # Annotation to indicate Beyla auto-instrumentation
         instrumentation.beyla.io/enabled: "true"
@@ -151,9 +156,10 @@ spec:
               value: "{{ .Values.beyla.otelEndpoint }}"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
               value: "http/protobuf"
-            # Exclude health check endpoints from traces and metrics (K8s probes noise)
-            - name: BEYLA_ROUTES_IGNORE_PATTERNS
-              value: "/api/health,/health"
+            # Route patterns, unmatched-route mode, ignored health endpoints and
+            # histogram buckets live in the mounted config file (no env vars).
+            - name: BEYLA_CONFIG_PATH
+              value: /etc/beyla/beyla-config.yml
             # Disable Beyla's internal traces (only export application traces)
             - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_FEATURES
               value: "application"
@@ -165,6 +171,10 @@ spec:
               value: "0"
             - name: BEYLA_INTERNAL_METRICS_PROMETHEUS_PORT
               value: "0"
+          volumeMounts:
+            - name: beyla-config
+              mountPath: /etc/beyla
+              readOnly: true
           ports:
             - name: beyla-metrics
               containerPort: 9090
@@ -180,3 +190,9 @@ spec:
               cpu: 100m
               memory: 256Mi
         {{- end }}
+      {{- if .Values.beyla.enabled }}
+      volumes:
+        - name: beyla-config
+          configMap:
+            name: {{ include "shipping-service.fullname" . }}-beyla
+      {{- end }}

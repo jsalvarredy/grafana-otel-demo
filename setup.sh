@@ -434,8 +434,15 @@ make_request() {
     fi
 }
 
-# Simulate realistic e-commerce traffic across ALL services
-for i in {1..40}; do
+# Simulate realistic e-commerce traffic across ALL services.
+# The seeded anomalies are deliberately sub-threshold so alerts stay silent at
+# rest: exactly ONE deliberate 5xx (products /error) and ONE /api/slow over the
+# whole run, diluted by ~560 requests (5xx ratio ~0.18%, over 3x under
+# the 0.6% slow-burn line; slow ~0.18%). They still leave one error trace and
+# one slow trace in Tempo.
+# Use ./incident.sh to fire the alerts on purpose.
+SEED_ITERATIONS=50
+for i in $(seq 1 "$SEED_ITERATIONS"); do
     # Users browsing products
     make_request "products.127.0.0.1.nip.io" "/api/products"
     make_request "products.127.0.0.1.nip.io" "/api/categories"
@@ -444,8 +451,13 @@ for i in {1..40}; do
     product_id=$((RANDOM % 8 + 1))
     make_request "products.127.0.0.1.nip.io" "/api/products/${product_id}"
 
+    # Orders service: healthy read traffic every iteration.
+    make_request "orders.127.0.0.1.nip.io" "/"
+    make_request "orders.127.0.0.1.nip.io" "/api/stats"
+    make_request "orders.127.0.0.1.nip.io" "/api/orders/user/user-$((RANDOM % 20 + 1))"
+
     # Place orders (cross-service call: orders -> products)
-    if (( RANDOM % 3 == 0 )); then
+    if (( i % 6 == 0 )); then
         order_data="{\"product_id\": ${product_id}, \"quantity\": 1, \"user_id\": \"user-$((RANDOM % 20 + 1))\"}"
         make_request "orders.127.0.0.1.nip.io" "/api/orders" "POST" "$order_data"
     fi
@@ -472,21 +484,15 @@ for i in {1..40}; do
     # Shipping service info endpoint
     make_request "shipping.127.0.0.1.nip.io" "/api/"
 
-    # Occasional slow endpoint to generate interesting latency data
-    if (( i % 5 == 0 )); then
+    # One slow request and one 5xx in total, mid-run (see comment above).
+    if (( i == SEED_ITERATIONS / 2 )); then
         make_request "shipping.127.0.0.1.nip.io" "/api/slow"
-    fi
-
-    # Occasional errors for interesting data (all services)
-    if (( i % 8 == 0 )); then
         make_request "products.127.0.0.1.nip.io" "/error"
-        make_request "orders.127.0.0.1.nip.io" "/error"
-        make_request "shipping.127.0.0.1.nip.io" "/api/error"
     fi
 
     # Progress indicator
     echo -n "."
-    sleep 0.2
+    sleep 0.1
 done
 
 echo ""

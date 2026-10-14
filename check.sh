@@ -158,11 +158,14 @@ if [ "$DEPLOYMENT_ANNOTATION_REQUIRED" = "0" ]; then
 else
   annotations=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/annotations" \
     --data-urlencode 'tags=deployment' --data-urlencode 'limit=100' 2>/dev/null || true)
-  if [ -n "$release_deployment_id" ] && \
-     echo "$annotations" | grep -Fq "id=${release_deployment_id}" && \
-     echo "$annotations" | grep -Fq "version=${release_version}" && \
-     echo "$annotations" | grep -Fq 'status:succeeded'; then
+  # One JSON object per line (API returns newest first), then match id and
+  # version within the SAME annotation instead of anywhere in the payload.
+  matching=$(printf '%s' "$annotations" | sed 's/},{"id"/}\n{"id"/g' \
+    | grep -F "id=${release_deployment_id}" | grep -F "version=${release_version}" || true)
+  if [ -n "$release_deployment_id" ] && printf '%s\n' "$matching" | grep -Fq 'status:succeeded'; then
     ok "Grafana annotation matches current release ${release_deployment_id} (${release_version}, succeeded)"
+  elif [ -n "$release_deployment_id" ] && printf '%s\n' "$matching" | head -1 | grep -Fq 'status:failed'; then
+    bad "Latest annotation for ${release_deployment_id} is failed — fix the readiness failures above and re-run ./setup.sh's verification (./check.sh alone never records a succeeded annotation)"
   else
     bad "No succeeded Grafana annotation matches the deployment ID/version currently running"
   fi
@@ -171,17 +174,17 @@ fi
 # ---------------------------------------------------------------------------
 section "Metrics signal (RED)"
 # ---------------------------------------------------------------------------
-for svc in products-service orders-service; do
-  v=$(promq "count(http_requests_total{service_name=\"$svc\"})")
-  if ge1 "$v"; then ok "SDK metrics present: $svc"; else bad "No http_requests_total for $svc"; fi
+# Single stable HTTP family (semconv C1) for all three services: SDK (Products,
+# Orders), OTel Java agent or Beyla (Shipping) all emit the same metric.
+for svc in products-service orders-service shipping-service; do
+  v=$(promq "count(http_server_request_duration_seconds_count{service_name=\"$svc\"})")
+  b=$(promq "count(http_server_request_duration_seconds_bucket{service_name=\"$svc\"})")
+  if ge1 "$v" && ge1 "$b"; then
+    ok "http_server_request_duration_seconds present: $svc"
+  else
+    bad "No http_server_request_duration_seconds_{count,bucket} for $svc (instrumentation down? Beyla without BTF?)"
+  fi
 done
-# Shipping is the P0 fix: it must now emit via the OTel Java agent (any kernel).
-vs=$(promq 'count(http_server_request_duration_seconds_count{service_name="shipping-service"})')
-if ge1 "$vs"; then
-  ok "shipping-service emitting HTTP metrics (OTel Java agent)"
-else
-  bad "shipping-service has NO HTTP metrics (Java agent down? Beyla without BTF?)"
-fi
 
 # ---------------------------------------------------------------------------
 section "Traces signal & Service Map"
@@ -216,19 +219,39 @@ done
 # ---------------------------------------------------------------------------
 section "Correlation: exemplars (metric → trace)"
 # ---------------------------------------------------------------------------
-# Exemplars come from Tempo's span metrics (metrics-generator remote-writes
-# them with send_exemplars: true) - that is what the APM latency panels use.
-# The apps' own JS histograms carry none: the OTel JS SDK does not wire
-# OTEL_METRICS_EXEMPLAR_FILTER yet (unlike Java/Python).
-ex=""
-for fam in traces_spanmetrics_latency_bucket http_server_duration_milliseconds_bucket; do
-  ex=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
-    --data-urlencode "query=$fam" \
-    --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null \
-    | grep -oE '"traceID":"[a-f0-9]+"' | head -1)
-  [ -n "$ex" ] && break
+# Span-metrics exemplars (Tempo metrics-generator) drive the APM latency panels;
+# the app family (http_server_request_duration_seconds) must carry them too.
+# Orders (Python) and Shipping (Java agent) are required; Products (Node SDK)
+# does not wire exemplars yet, so it is not checked.
+# Tempo's metrics-generator labels exemplars "traceID"; app exemplars that go
+# through Alloy's otelcol.exporter.prometheus use "trace_id" (and span_id).
+# Accept both. Reads query_exemplars JSON on stdin and prints the first trace
+# label name found (traceID | trace_id), or nothing.
+exemplar_label(){
+  grep -oE '"(traceID|trace_id)"[[:space:]]*:[[:space:]]*"[a-fA-F0-9]+"' | head -1 | sed -E 's/^"([A-Za-z_]+)".*/\1/'
+}
+# Probe a query; sets EX_LABEL (label found or empty) and EX_SERIES (number of
+# exemplar series returned, so "none" and "present but unparsed" differ).
+exemplar_probe(){
+  local body
+  body=$(curl -s -G -u "$AUTH" "$GRAFANA_URL/api/datasources/proxy/uid/Prometheus/api/v1/query_exemplars" \
+    --data-urlencode "query=$1" \
+    --data-urlencode "start=$(( $(date +%s) - 900 ))" --data-urlencode "end=$(date +%s)" 2>/dev/null)
+  EX_LABEL=$(printf '%s' "$body" | exemplar_label)
+  EX_SERIES=$(printf '%s' "$body" | grep -o '"seriesLabels"' | wc -l | tr -d ' ')
+}
+exemplar_probe traces_spanmetrics_latency_bucket
+if [ -n "$EX_LABEL" ]; then ok "Exemplars present on span metrics (label: $EX_LABEL)"; else warn "No span-metrics exemplars in last 15m (series returned: $EX_SERIES; need traffic with sampled traces)"; fi
+for svc in orders-service shipping-service; do
+  exemplar_probe "http_server_request_duration_seconds_bucket{service_name=\"$svc\"}"
+  if [ -n "$EX_LABEL" ]; then
+    ok "Exemplars present on http_server_request_duration_seconds_bucket: $svc (label: $EX_LABEL, series: $EX_SERIES)"
+  elif [ "$svc" = "shipping-service" ] && kubectl get deploy shipping-service -n demo -o jsonpath='{.spec.template.spec.containers[*].name}' 2>/dev/null | grep -qw beyla; then
+    warn "No app-family exemplars for shipping-service (Beyla does not emit exemplars)"
+  else
+    bad "No exemplars on http_server_request_duration_seconds_bucket for $svc in last 15m (exemplar series returned: $EX_SERIES; >0 means unparsed trace label, 0 means none emitted)"
+  fi
 done
-if [ -n "$ex" ]; then ok "Exemplars present on latency metrics (span metrics)"; else warn "No exemplars in last 15m (need traffic with sampled traces)"; fi
 
 # ---------------------------------------------------------------------------
 section "Drilldown apps (queryless)"

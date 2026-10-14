@@ -1,4 +1,10 @@
 import os
+
+# Stable HTTP semantic conventions (http.server.request.duration, seconds). Must be
+# set before the Flask instrumentor initialises; the chart sets it too.
+os.environ.setdefault('OTEL_SEMCONV_STABILITY_OPT_IN', 'http')
+os.environ.setdefault('OTEL_METRICS_EXEMPLAR_FILTER', 'trace_based')
+
 import json
 import time
 import random
@@ -85,18 +91,8 @@ meter = metrics.get_meter(__name__)
 # RED METRICS (Rate, Error, Duration) - Infrastructure Observability
 # ===================================================================
 
-# HTTP Request Counter - tracks all incoming requests
-request_counter = meter.create_counter(
-    'http_requests_total',
-    description='Total number of HTTP requests by endpoint, method, and status code',
-)
-
-# HTTP Server Duration - tracks request latency for SLA/SLO monitoring
-http_server_duration = meter.create_histogram(
-    'http_server_duration',
-    description='HTTP server request duration in milliseconds',
-    unit='ms',
-)
+# HTTP server RED metrics come from opentelemetry-instrumentation-flask
+# (stable semconv: http.server.request.duration, unit s, with exemplars).
 
 # Order-specific metrics
 order_counter = meter.create_counter(
@@ -407,33 +403,6 @@ def before_request():
         user_id = request.json.get('user_id')
         if user_id:
             update_session(user_id)
-
-@app.after_request
-def after_request(response):
-    """Capture metrics after request completes"""
-    if hasattr(g, 'start_time'):
-        duration_ms = (time.time() - g.start_time) * 1000
-
-        # Get endpoint path
-        endpoint = request.url_rule.rule if request.url_rule else request.path
-        method = request.method
-        status_code = response.status_code
-
-        # Record HTTP request counter with status code
-        request_counter.add(1, {
-            'endpoint': endpoint,
-            'method': method,
-            'http_status_code': str(status_code),
-        })
-
-        # Record HTTP server duration (latency) for SLO monitoring
-        http_server_duration.record(duration_ms, {
-            'endpoint': endpoint,
-            'method': method,
-            'http_status_code': str(status_code),
-        })
-
-    return response
 
 # ===================================================================
 # API ENDPOINTS
